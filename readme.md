@@ -52,7 +52,7 @@ If everything went smoothly, anyone on the internet can email `admin@yourdomain.
 
 ### Current ###
 
-* brain dead simple configuration (see botemail.lua)
+* brain dead simple configuration (see config.example.lua)
 * brain dead simple database backend (sqlite3)
 * brain dead simple license (MIT)
 
