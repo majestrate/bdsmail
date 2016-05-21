@@ -68,7 +68,7 @@ func (l *Lua) CallMailFilter(funcname, addr, recip, sender, body string) (ret in
 	C.lua_pushstring(l.state, cs)
 	cb := C.CString(body)
 	C.lua_pushstring(l.state, cb)
-	C.lua_call(l.state, 3, 1)
+	C.lua_call(l.state, 4, 1)
 	cret := C.lua_tointeger(l.state, -1)
 	// convert return value to int
 	ret = int(cret)
