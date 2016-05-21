@@ -21,8 +21,10 @@ func main() {
 	}
 
 	s := server.New()
+	// load config
 	err := s.LoadConfig(cfg_fname)
 	if err == nil {
+		// bind server
 		err = s.Bind()
 		// start signal processer
 		go func(s *server.Server) {
@@ -46,14 +48,19 @@ func main() {
 				}
 			}
 		}(s)
-		signal.Notify(sigchnl, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
 		if err == nil {
+			// set signal handler
+			signal.Notify(sigchnl, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
+
 			log.Info("Starting Up Mail Server")
+			// run server
 			s.Run()
 			log.Info("Mail Server done")
+			os.Exit(0)
 		}
 	}
 	if err != nil {
 		log.Error(err)
+		os.Exit(1)
 	}
 }
