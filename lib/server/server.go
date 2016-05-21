@@ -3,8 +3,8 @@ package server
 import (
 	"bytes"
 	log "github.com/Sirupsen/logrus"
-	"github.com/majestrate/botemail/lib/lua"
-	"github.com/majestrate/botemail/lib/maildir"
+	"github.com/majestrate/bdsmail/lib/lua"
+	"github.com/majestrate/bdsmail/lib/maildir"
 	"github.com/mhale/smtpd"
 	"net"
 	"strings"

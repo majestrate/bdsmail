@@ -2,7 +2,7 @@ package main
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"github.com/majestrate/botemail/lib/server"
+	"github.com/majestrate/bdsmail/lib/server"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +11,7 @@ import (
 func main() {
 	sigchnl := make(chan os.Signal)
 	log.SetLevel(log.InfoLevel)
+	log.Info(server.Version())
 	var cfg_fname string
 	if len(os.Args) == 1 {
 		// no args

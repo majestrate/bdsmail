@@ -1,9 +1,13 @@
 --
--- botemail example config
+-- example botemail config
 --
 
+
+-- what address do we bind smtp to?
 bind = ":2525"
-domain = "i2p.rocks"
+-- what is the domain we are serving mail for?
+domain = "myserver.tld"
+-- where do we put recv'd mail ?
 maildir = "/tmp/mail"
 
 
