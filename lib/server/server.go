@@ -137,21 +137,18 @@ func (s *Server) filterMail(ev *MailEvent) (err error) {
 }
 
 func (s *Server) Run() {
-	defer s.end()
 	// run acceptor
 	go func() {
 		log.Info("Serving SMTP server on ", s.listener.Addr())
-		err := s.serv.Serve(s.listener)
-		if err != nil {
-			log.Fatal("smtp fail ", err)
-		}
+		s.serv.Serve(s.listener)
+		log.Info("SMTP Server ended")
 	}()
 	log.Debug("run mail")
 	for {
 		// filtering
 		ev, ok := <-s.chnl
 		if !ok {
-			log.Debug("exiting mainloop")
+			log.Info("exiting mainloop")
 			return
 		}
 		recip := ev.Recip
@@ -177,13 +174,14 @@ func (s *Server) allowRecip(recip string) (allow bool) {
 	return
 }
 
-// end serving
-func (s *Server) end() {
+// stop server
+func (s *Server) Stop() {
+	close(s.chnl)
 	s.luamtx.Lock()
 	s.l.Close()
 	s.listener.Close()
-	close(s.chnl)
 	s.luamtx.Unlock()
+	log.Info("Server Stopped")
 }
 
 // load configuration file

@@ -12,14 +12,14 @@ func main() {
 	domain := "localhost"
 	bind := ":2525"
 	maildir := "mail"
-	
+
 	if len(os.Args) > 1 {
 		domain = os.Args[1]
 	}
 	if len(os.Args) > 2 {
 		maildir = os.Args[2]
 	}
-	
+
 	fmt.Printf("-- auto generated config made %s\n", time.Now().Format(time.ANSIC))
 	fmt.Printf(`bind = "%s"`, bind)
 	fmt.Printf("\n")
@@ -27,7 +27,7 @@ func main() {
 	fmt.Printf("\n")
 	fmt.Printf(`maildir = "%s"`, maildir)
 	fmt.Printf("\n")
-	for _, funcname := range []string {"whitelist", "blacklist", "checkspam"} {
+	for _, funcname := range []string{"whitelist", "blacklist", "checkspam"} {
 		fmt.Printf("\n\nfunction %s(addr, recip, sender, body)\n    return 0\nend\n\n", funcname)
 	}
 }

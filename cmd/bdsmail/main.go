@@ -37,16 +37,20 @@ func main() {
 						} else {
 							log.Error("Failed to reload configuration ", err)
 						}
+					} else if sig == syscall.SIGTERM || sig == syscall.SIGINT {
+						log.Info("Stopping Server")
+						s.Stop()
 					}
 				} else {
 					return
 				}
 			}
 		}(s)
-		signal.Notify(sigchnl, syscall.SIGHUP)
+		signal.Notify(sigchnl, syscall.SIGHUP, syscall.SIGTERM, syscall.SIGINT)
 		if err == nil {
 			log.Info("Starting Up Mail Server")
 			s.Run()
+			log.Info("Mail Server done")
 		}
 	}
 	if err != nil {
