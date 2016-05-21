@@ -4,25 +4,6 @@ Brain Dead Simple Mail Server
 
 Server that runs i2p.rocks email
 
-## Features ##
-
-### Current ###
-
-* brain dead simple configuration (see botemail.lua)
-* brain dead simple database backend (sqlite3)
-* brain dead simple license (MIT)
-
-### Near Future ###
-
-* brain dead simple tls enabled by default
-* brain dead simple smtp access
-* brain dead simple pop3 access
-
-### Future (Eventually) ###
-
-* brain dead simple i2pbote gateway
-* brain dead simple inet/i2p mail relay
-
 ## Usage ##
 
 To use this software you need to own a domain.
@@ -66,3 +47,22 @@ Finnally, forward port 25 to 2525 so that inbound mail reaches the mail server (
     # iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 25 -j REDIRECT --to-port 2525
 
 If everything went smoothly, anyone on the internet can email `admin@yourdomain.tld` now.
+
+## Features ##
+
+### Current ###
+
+* brain dead simple configuration (see botemail.lua)
+* brain dead simple database backend (sqlite3)
+* brain dead simple license (MIT)
+
+### Near Future ###
+
+* brain dead simple tls enabled by default
+* brain dead simple smtp access
+* brain dead simple pop3 access
+
+### Future (Eventually) ###
+
+* brain dead simple i2pbote gateway
+* brain dead simple inet/i2p mail relay
