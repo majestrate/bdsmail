@@ -28,6 +28,6 @@ func main() {
 	fmt.Printf(`maildir = "%s"`, maildir)
 	fmt.Printf("\n")
 	for _, funcname := range []string {"whitelist", "blacklist", "checkspam"} {
-		fmt.Printf("\n\nfunction %s(addr, recip, sender, body)\nreturn 0\nend\n\n", funcname)
+		fmt.Printf("\n\nfunction %s(addr, recip, sender, body)\n    return 0\nend\n\n", funcname)
 	}
 }
