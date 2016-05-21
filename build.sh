@@ -2,7 +2,7 @@
 set -e
 export GOPATH=$PWD/go
 
-go get -v github.com/majestrate/bdsmail/cmd/bdsconfig
-go get -v github.com/majestrate/bdsmail/cmd/bdsmail
-cp $GOPATH/go/bin/bdsmail $PWD
-cp $GOPATH/go/bin/bdsconfig $PWD
+go get -u -v github.com/majestrate/bdsmail/cmd/bdsconfig
+go get -u -v github.com/majestrate/bdsmail/cmd/bdsmail
+cp $GOPATH/bin/bdsmail $PWD
+cp $GOPATH/bin/bdsconfig $PWD

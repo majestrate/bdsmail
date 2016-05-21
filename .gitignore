@@ -1,1 +1,8 @@
 *~
+
+# binary files
+bdsconfig
+bdsmail
+
+# gopath
+go/
