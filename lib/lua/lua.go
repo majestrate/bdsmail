@@ -15,8 +15,8 @@ import (
 )
 
 var ErrNoJIT = errors.New("jit not enabled")
-const configvar = "config"
 
+const configvar = "config"
 
 // lua interpreter
 type Lua struct {
@@ -57,9 +57,11 @@ func (l *Lua) GetConfigOpt(name string) (val string, ok bool) {
 //
 // res = funcname(recip, sender, body)
 //
-func (l *Lua) CallMailFilter(funcname, recip, sender, body string) (ret int) {
+func (l *Lua) CallMailFilter(funcname, addr, recip, sender, body string) (ret int) {
 	cf := C.CString(funcname)
 	C.lua_getfield(l.state, C.LUA_GLOBALSINDEX, cf)
+	ca := C.CString(addr)
+	C.lua_pushstring(l.state, ca)
 	cr := C.CString(recip)
 	C.lua_pushstring(l.state, cr)
 	cs := C.CString(sender)
@@ -74,6 +76,7 @@ func (l *Lua) CallMailFilter(funcname, recip, sender, body string) (ret int) {
 	C.free(unsafe.Pointer(cb))
 	C.free(unsafe.Pointer(cs))
 	C.free(unsafe.Pointer(cr))
+	C.free(unsafe.Pointer(ca))
 	C.free(unsafe.Pointer(cf))
 	// do lua gc
 	l.GC()
@@ -92,7 +95,7 @@ func (l *Lua) LoadFile(fname string) (err error) {
 		}
 	} else {
 		// failed to load file
-		err = errors.New("failed to load file "+fname)
+		err = errors.New("failed to load file " + fname)
 	}
 	return
 }
@@ -130,4 +133,3 @@ func New() (l *Lua) {
 	}
 	return
 }
-

@@ -5,16 +5,15 @@ import (
 	"net"
 )
 
-
 // event fired when we got a new mail message
 type MailEvent struct {
 	// remote address of sender
 	Addr net.Addr
 	// recipiant of message
-	Recip string 
+	Recip string
 	// sender of message
 	Sender string
-	 // body of message
+	// body of message
 	Body *bytes.Buffer
 }
 

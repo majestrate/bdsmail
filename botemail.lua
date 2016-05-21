@@ -2,19 +2,19 @@
 -- botemail example config
 --
 
-bind = ":0"
+bind = ":2525"
 domain = "i2p.rocks"
 maildir = "/tmp/mail"
 
-function whitelist(recip, sender, body)
-   return 1
-end
-
-function blacklist(recip, sender, body)
+function whitelist(addr, recip, sender, body)
    return 0
 end
 
-function checkspam(recip, sender, body)
+function blacklist(addr, recip, sender, body)
+   return 0
+end
+
+function checkspam(addr, recip, sender, body)
    return 0
 end
 

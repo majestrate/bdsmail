@@ -2,11 +2,13 @@ package server
 
 import (
 	"bytes"
+	log "github.com/Sirupsen/logrus"
 	"github.com/majestrate/botemail/lib/lua"
 	"github.com/majestrate/botemail/lib/maildir"
 	"github.com/mhale/smtpd"
-	log "github.com/Sirupsen/logrus"
 	"net"
+	"strings"
+	"sync"
 )
 
 // handler of mail messages
@@ -24,21 +26,31 @@ type Server struct {
 	// mail handler
 	Handler MailHandler
 
-
 	// unexported fields
-	
-	l *lua.Lua
-	serv *smtpd.Server
-	listener net.Listener
-	chnl chan *MailEvent
-	mail maildir.MailDir
 
+	// lua interpreter core
+	l *lua.Lua
+	// the server implementation
+	serv *smtpd.Server
+	// listener for server implementation
+	listener net.Listener
+	// recv mail events from handlers
+	chnl chan *MailEvent
+	// maildir storage
+	mail maildir.MailDir
+	// lock to use to ensure 1 thread accessing lua
+	luamtx sync.RWMutex
+	// filepath to configuration
+	configFname string
 }
 
 // bind server to address in config
 func (s *Server) Bind() (err error) {
+	// we touch the lua config so lock
+	s.luamtx.Lock()
+	defer s.luamtx.Unlock()
 	addr, ok := s.l.GetConfigOpt("bind")
-	if ! ok {
+	if !ok {
 		addr = ":25"
 	}
 	log.Info("Bind mail server to", addr)
@@ -52,10 +64,10 @@ func (s *Server) queueMail(addr net.Addr, from string, to []string, body []byte)
 	// for each recip fire a mail event
 	for _, recip := range to {
 		ev := &MailEvent{
-			Addr: addr,
+			Addr:   addr,
 			Sender: from,
-			Recip: recip,
-			Body: bytes.NewBuffer(body),
+			Recip:  recip,
+			Body:   bytes.NewBuffer(body),
 		}
 		s.chnl <- ev
 	}
@@ -79,8 +91,11 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 // run a lua filter given a mail event
 // return the code returned by the lua function
 func (s *Server) runFilter(filtername string, ev *MailEvent) int {
-	log.Debug(`running filter "`+filtername+`"...`)
-	ret := s.l.CallMailFilter(filtername, ev.Recip, ev.Sender, ev.Body.String())
+	// acquire lua lock
+	s.luamtx.Lock()
+	defer s.luamtx.Unlock()
+	log.Debug(`running filter "` + filtername + `"...`)
+	ret := s.l.CallMailFilter(filtername, ev.Addr.String(), ev.Recip, ev.Sender, ev.Body.String())
 	log.Debug(`filter "`+filtername+`" returned `, ret)
 	return ret
 }
@@ -99,9 +114,9 @@ func (s *Server) filterMail(ev *MailEvent) (err error) {
 	if s.runFilter("blacklist", ev) == 1 {
 		// drop message
 		log.WithFields(log.Fields{
-			"addr": ev.Addr,
-			"recip": ev.Recip,
-			"sender": ev.Sender,
+			"addr":    ev.Addr,
+			"recip":   ev.Recip,
+			"sender":  ev.Sender,
 			"msgsize": ev.Body.Len(),
 		}).Info("message hit blacklist")
 		return
@@ -109,9 +124,9 @@ func (s *Server) filterMail(ev *MailEvent) (err error) {
 	if s.runFilter("checkspam", ev) == 1 {
 		// we got a spam message
 		log.WithFields(log.Fields{
-			"addr": ev.Addr,
-			"recip": ev.Recip,
-			"sender": ev.Sender,
+			"addr":    ev.Addr,
+			"recip":   ev.Recip,
+			"sender":  ev.Sender,
 			"msgsize": ev.Body.Len(),
 		}).Info("message hit spam filter")
 		return
@@ -134,8 +149,8 @@ func (s *Server) Run() {
 	log.Debug("run mail")
 	for {
 		// filtering
-		ev , ok := <- s.chnl
-		if ! ok {
+		ev, ok := <-s.chnl
+		if !ok {
 			log.Debug("exiting mainloop")
 			return
 		}
@@ -154,26 +169,37 @@ func (s *Server) Run() {
 // do we allow a recipiant ?
 func (s *Server) allowRecip(recip string) (allow bool) {
 	if s.Handler == nil {
-		// default to always allowing messages
-		allow = true
+		// allow recip that only match the hostname of the server
+		allow = strings.HasSuffix(recip, "@"+s.serv.Hostname)
 	} else {
 		allow = s.Handler.AllowRecipiant(recip)
 	}
 	return
 }
 
-
 // end serving
 func (s *Server) end() {
+	s.luamtx.Lock()
 	s.l.Close()
 	s.listener.Close()
 	close(s.chnl)
+	s.luamtx.Unlock()
 }
 
 // load configuration file
 func (s *Server) LoadConfig(fname string) (err error) {
 	log.Debug("Load config file ", fname)
-	err = s.l.LoadFile(fname)
+	s.configFname = fname
+	err = s.ReloadConfig()
+	return
+}
+
+// reload server configuration
+func (s *Server) ReloadConfig() (err error) {
+	// acquire lua lock
+	s.luamtx.Lock()
+	defer s.luamtx.Unlock()
+	err = s.l.LoadFile(s.configFname)
 	if err == nil {
 		str, _ := s.l.GetConfigOpt("maildir")
 		if len(str) > 0 {
@@ -196,7 +222,7 @@ func (s *Server) LoadConfig(fname string) (err error) {
 func New() (s *Server) {
 	s = &Server{
 		chnl: make(chan *MailEvent, 1024),
-		l: lua.New(),
+		l:    lua.New(),
 		serv: &smtpd.Server{
 			Appname: "botemail",
 		},

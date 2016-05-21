@@ -1,14 +1,16 @@
 package main
 
 import (
-	"github.com/majestrate/botemail/lib/server"
 	log "github.com/Sirupsen/logrus"
+	"github.com/majestrate/botemail/lib/server"
 	"os"
+	"os/signal"
+	"syscall"
 )
 
-
 func main() {
-	log.SetLevel(log.DebugLevel)
+	sigchnl := make(chan os.Signal)
+	log.SetLevel(log.InfoLevel)
 	var cfg_fname string
 	if len(os.Args) == 1 {
 		// no args
@@ -21,6 +23,26 @@ func main() {
 	err := s.LoadConfig(cfg_fname)
 	if err == nil {
 		err = s.Bind()
+		// start signal processer
+		go func(s *server.Server) {
+			for {
+				sig, ok := <-sigchnl
+				if ok {
+					if sig == syscall.SIGHUP {
+						// got sighup
+						err := s.ReloadConfig()
+						if err == nil {
+							log.Info("Reloaded configuration")
+						} else {
+							log.Error("Failed to reload configuration ", err)
+						}
+					}
+				} else {
+					return
+				}
+			}
+		}(s)
+		signal.Notify(sigchnl, syscall.SIGHUP)
 		if err == nil {
 			log.Info("Starting Up Mail Server")
 			s.Run()
