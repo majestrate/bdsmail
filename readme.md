@@ -1,5 +1,3 @@
-# BDS Mail #
-
 ![logo](https://github.com/majestrate/bdsmail/raw/master/contrib/assets/logo.png "logo")
 
 Brain Dead Simple Mail Server
