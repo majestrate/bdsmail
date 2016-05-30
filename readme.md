@@ -4,6 +4,9 @@ Brain Dead Simple Mail Server
 
 Server that runs i2p.rocks email
 
+
+![logo](https://github.com/majestrate/bdsmail/raw/master/contrib/assets/logo.png "logo")
+
 ## Usage ##
 
 To use this software you need to own a domain.
