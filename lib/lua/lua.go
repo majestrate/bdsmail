@@ -55,7 +55,7 @@ func (l *Lua) GetConfigOpt(name string) (val string, ok bool) {
 // return an integer that the function returns or -1 on error
 // lua call is in the following format:
 //
-// res = funcname(recip, sender, body)
+// res = funcname(addr, recip, sender, body)
 //
 func (l *Lua) CallMailFilter(funcname, addr, recip, sender, body string) (ret int) {
 	cf := C.CString(funcname)

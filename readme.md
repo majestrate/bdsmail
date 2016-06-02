@@ -1,8 +1,9 @@
-# BDS Mail #
+![logo](https://github.com/majestrate/bdsmail/raw/master/contrib/assets/logo.png "logo")
 
 Brain Dead Simple Mail Server
 
-Server that runs i2p.rocks email
+
+## This software is still in heavy development ##
 
 ## Usage ##
 

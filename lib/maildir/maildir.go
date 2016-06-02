@@ -1,6 +1,7 @@
 package maildir
 
 import (
+	"crypto/rand"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"io"
@@ -12,27 +13,34 @@ import (
 // maildir mailbox protocol
 type MailDir string
 
+// get this maildir as a string
 func (d MailDir) String() (str string) {
 	str = string(d)
 	return
 }
 
+// get absolute filepath for this maildir
+func (d MailDir) Filepath() (str string) {
+	str, _ = filepath.Abs(string(d))
+	return
+}
+
 // ensure the maildir is well formed
 func (d MailDir) Ensure() (err error) {
-	dir := d.String()
+	dir := d.Filepath()
 	_, err = os.Stat(dir)
 	if os.IsNotExist(err) {
 		// create main directory
-		err = os.Mkdir(dir, 0750)
+		err = os.Mkdir(dir, 0700)
 	}
 	if err == nil {
 		// create subdirs
 		for _, subdir := range []string{"new", "cur", "tmp"} {
-			subdir = filepath.Join(d.String(), subdir)
+			subdir = filepath.Join(dir, subdir)
 			_, err = os.Stat(subdir)
 			if os.IsNotExist(err) {
 				// create non existant subdir
-				err = os.Mkdir(subdir, 0750)
+				err = os.Mkdir(subdir, 0700)
 			}
 		}
 	}
@@ -43,7 +51,9 @@ func (d MailDir) Ensure() (err error) {
 func (d MailDir) File() (fname string) {
 	hostname, err := os.Hostname()
 	if err == nil {
-		fname = fmt.Sprintf("%d.%d.%s", time.Now().Unix(), os.Getpid(), hostname)
+		b := make([]byte, 8)
+		io.ReadFull(rand.Reader, b)
+		fname = fmt.Sprintf("%x%d%d.%s", b, time.Now().Unix(), os.Getpid(), hostname)
 	} else {
 		log.Fatal("hostname() call failed", err)
 	}
@@ -56,7 +66,7 @@ func (d MailDir) TempFile() (fname string) {
 }
 
 func (d MailDir) Temp(fname string) (f string) {
-	f = filepath.Join(d.String(), "tmp", fname)
+	f = filepath.Join(d.Filepath(), "tmp", fname)
 	return
 }
 
@@ -66,7 +76,12 @@ func (d MailDir) NewFile() (fname string) {
 }
 
 func (d MailDir) New(fname string) (f string) {
-	f = filepath.Join(d.String(), "new", fname)
+	f = filepath.Join(d.Filepath(), "new", fname)
+	return
+}
+
+func (d MailDir) Cur(fname string) (f string) {
+	f = filepath.Join(d.Filepath(), "cur", fname)
 	return
 }
 
@@ -85,7 +100,7 @@ func (d MailDir) Deliver(body io.Reader) (err error) {
 			}
 		}()
 		// chdir to maildir
-		err = os.Chdir(d.String())
+		err = os.Chdir(d.Filepath())
 		if err == nil {
 			fname := d.File()
 			for {
@@ -107,19 +122,114 @@ func (d MailDir) Deliver(body io.Reader) (err error) {
 			}
 			// try writing file
 			if err == nil {
-				f, err = os.OpenFile(d.Temp(fname), os.O_CREATE|os.O_WRONLY, 0640)
+				f, err = os.OpenFile(d.Temp(fname), os.O_CREATE|os.O_WRONLY, 0600)
 				if err == nil {
 					// write body
 					_, err = io.Copy(f, body)
 					f.Close()
 					if err == nil {
-						// now symlink
-						err = os.Symlink(filepath.Join("..", "tmp", fname), filepath.Join("new", fname))
+						err = os.Rename(d.Temp(fname), d.New(fname))
 						// if err is nil it's delivered
 					}
 				}
 			}
 		}
 	}
+	return
+}
+
+// list messages in subdirectory
+func (d MailDir) listDir(sd string) (msgs []Message, err error) {
+	var f *os.File
+	f, err = os.Open(filepath.Join(d.Filepath(), sd))
+	if err == nil {
+		defer f.Close()
+		var files []string
+		files, err = f.Readdirnames(0)
+		for _, mf := range files {
+			msgs = append(msgs, Message(mf))
+		}
+	}
+	return
+}
+
+// list new messages in this maildir
+func (d MailDir) ListNew() (msgs []Message, err error) {
+	msgs, err = d.listDir("new")
+	return
+}
+
+// list currently held messages in this maildir
+func (d MailDir) ListCur() (msgs []Message, err error) {
+	msgs, err = d.listDir("cur")
+	return
+}
+
+// process new message and move it to the cur directory
+func (d MailDir) ProcessNew(msg Message, flags ...Flag) (err error) {
+	// find message
+	fname := d.New(msg.Filepath())
+	_, err = os.Stat(fname)
+	if err == nil {
+		// message exists and is accessable
+		if len(flags) > 0 {
+			var fl string
+			for _, f := range flags {
+				fl += f.String()
+			}
+			err = os.Rename(fname, d.Cur(fmt.Sprintf("%s:2,%s", msg.Name(), fl)))
+		} else {
+			// default to seen if no flags are specified
+			err = os.Rename(fname, d.Cur(fmt.Sprintf("%s:2,S", msg.Name())))
+		}
+	}
+	return
+}
+
+// process message in cur and change its flags if specified
+func (d MailDir) ProcessCur(msg Message, flags ...Flag) (err error) {
+	fname := d.Cur(msg.Filepath())
+	_, err = os.Stat(fname)
+	if err == nil {
+		// message exists and is accessable
+		if len(flags) > 0 {
+			var fl string
+			for _, f := range flags {
+				fl += f.String()
+			}
+			// set message flags
+			err = os.Rename(fname, d.Cur(fmt.Sprintf("%s:2,%s", msg.Name(), fl)))
+		} else {
+			// don't touch the message's flags if non are provided
+		}
+	}
+	return
+}
+
+// return true if this message is in cur directory
+func (d MailDir) IsCur(msg Message) (is bool, err error) {
+	_, err = os.Stat(d.Cur(msg.Filepath()))
+	if os.IsNotExist(err) {
+		err = nil
+	} else {
+		is = true
+	}
+	return
+}
+
+// return true if this message is in cur directory
+func (d MailDir) IsNew(msg Message) (is bool, err error) {
+	_, err = os.Stat(d.New(msg.Filepath()))
+	if os.IsNotExist(err) {
+		err = nil
+	} else {
+		is = true
+	}
+	return
+}
+
+// open message in cur directory
+func (d MailDir) OpenMessage(msg Message) (r io.ReadCloser, err error) {
+	r, err = os.Open(d.Cur(msg.Filepath()))
 	return
 }

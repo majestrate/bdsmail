@@ -2,6 +2,7 @@ package server
 
 import (
 	"bytes"
+	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"github.com/majestrate/bdsmail/lib/lua"
 	"github.com/majestrate/bdsmail/lib/maildir"
@@ -23,7 +24,7 @@ type MailHandler interface {
 // botemail mail server
 type Server struct {
 
-	// mail handler
+	// custom mail handler
 	Handler MailHandler
 
 	// unexported fields
@@ -71,6 +72,13 @@ func (s *Server) queueMail(addr net.Addr, from string, to []string, body []byte)
 		}
 		s.chnl <- ev
 	}
+}
+
+// get the maildir for a recipiant
+func (s *Server) getUserMaildir(recip string) (d maildir.MailDir) {
+	// TODO: implement
+	d = s.mail
+	return
 }
 
 // we got mail that was not dropped by the filters
@@ -222,7 +230,7 @@ func New() (s *Server) {
 		chnl: make(chan *MailEvent, 1024),
 		l:    lua.New(),
 		serv: &smtpd.Server{
-			Appname: "botemail",
+			Appname: fmt.Sprintf("BDSMail-%s", Version()),
 		},
 	}
 	if s.l.JIT() != nil {
