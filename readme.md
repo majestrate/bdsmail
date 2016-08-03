@@ -37,10 +37,11 @@ To generate an initial configuration file run the following:
 
 ### Running ###
 
-Copy `bdsmail` and `bdsmail.lua` to the machine that `yourdomain.tld` points to.
+Copy `assets` `bdsmail` and `bdsmail.lua` to the machine that `yourdomain.tld` points to in 1 directory.
 
 Then on that machine run the mail server:
 
+    $ cd /path/to/where/you/put/the/files
     $ ./bdsmail bdsmail.lua
 
 Finnally, forward port 25 to 2525 so that inbound mail reaches the mail server (requires root)
