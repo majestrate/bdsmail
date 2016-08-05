@@ -95,6 +95,7 @@ func (s *Server) Bind() (err error) {
 			s.maillistener = session
 			s.session = session
 			log.Infof("We are %s", session.B32())
+			s.inserv.Hostname = session.B32()
 			s.mailer = sendmail.NewMailer()
 			s.mailer.Retries = 10
 			s.mailer.Dial = session.Dial
@@ -277,7 +278,7 @@ func (s *Server) Run() {
 func (s *Server) allowRecip(recip string) (allow bool) {
 	if s.Handler == nil {
 		// allow recip that only match the hostname of the server or the base32 address of the server
-		allow = strings.HasSuffix(recip, "@"+s.inserv.Hostname) || strings.HasSuffix(recip, "@"+s.session.B32())
+		allow = strings.HasSuffix(recip, "@"+s.inserv.Hostname)
 		// ... then check database
 		if allow && s.dao != nil {
 			u, err := s.dao.GetUser(recip)
