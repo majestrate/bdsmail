@@ -1,6 +1,6 @@
 package cryptonight
 
-// #cgo CFLAGS: -maes -std=c11
+// #cgo CFLAGS: -maes -std=gnu11
 // #include "cn.h"
 import "C"
 import "unsafe"
