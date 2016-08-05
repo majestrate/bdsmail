@@ -310,6 +310,7 @@ func (s *Server) handleInetMail(remote net.Addr, from string, to []string, body 
 			go func (j *sendmail.DeliverJob) {
 				if <- j.Result {
 					// successful delivery
+					log.Infof("mail to %s successfully delivered", recip)
 				}
 				chnl <- j.Result
 			}(d)
