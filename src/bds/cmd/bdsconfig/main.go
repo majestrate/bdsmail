@@ -28,7 +28,7 @@ func main() {
 	fmt.Printf("-- auto generated config made %s\n", time.Now().Format(time.ANSIC))
 	fmt.Printf(`i2paddr = "%s"`, i2paddr)
 	fmt.Printf("\n")
-	fmt.Printf(`keyfile = "%s"`, keyfile)
+	fmt.Printf(`i2pkeyfile = "%s"`, keyfile)
 	fmt.Printf("\n")
 	fmt.Printf(`bindmail = "%s"`, bindmail)
 	fmt.Printf("\n")

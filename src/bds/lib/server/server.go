@@ -95,6 +95,12 @@ func (s *Server) Bind() (err error) {
 			s.maillistener = session
 			s.session = session
 			log.Infof("We are %s", session.B32())
+			s.mailer = sendmail.NewMailer()
+			s.mailer.Retries = 10
+			s.mailer.Dial = session.Dial
+			s.mailer.Resolve = func(addr string) (net.Addr, error) {
+				return session.LookupI2P(addr)
+			}
 		} else {
 			// close session we got an error setting up local smtp listener
 			session.Close()
@@ -333,6 +339,10 @@ func (s *Server) handleInetMail(remote net.Addr, from string, to []string, body 
 func (s *Server) Stop() {
 	close(s.chnl)
 	s.luamtx.Lock()
+	if s.mailer != nil {
+		s.mailer.Quit()
+		s.mailer = nil
+	}
 	if s.maillistener != nil {
 		s.maillistener.Close()
 		s.maillistener = nil
@@ -345,11 +355,6 @@ func (s *Server) Stop() {
 		s.weblistener.Close()
 		s.weblistener = nil
 	}
-	if s.mailer != nil {
-		s.mailer.Quit()
-		s.mailer = nil
-	}
-	
 	if s.l != nil {
 		s.l.Close()
 		s.l = nil

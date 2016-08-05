@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/smtp"
 	"strings"
+	"time"
 )
 
 // job for delivering mail
@@ -53,6 +54,7 @@ func (d *DeliverJob) Cancel() {
 // run delivery
 func (d *DeliverJob) run() {
 	tries := 0
+	sec := time.Duration(1)
 	var err error
 	for (d.unlimited || tries < d.retries) && !d.cancel {
 		// try visiting connection with tryDeliver method
@@ -70,6 +72,11 @@ func (d *DeliverJob) run() {
 			// failed to deliver
 			tries ++
 			log.Warnf("failed to deliver message to %s from %s: %s", d.recip, d.from, err.Error())
+			sec *= 2
+			if sec > 1024 {
+				sec = 1024
+			}
+			time.Sleep(sec * time.Second)
 		}
 	}
 	// failed to deliver
