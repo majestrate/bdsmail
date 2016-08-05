@@ -13,12 +13,6 @@ import (
 // maildir mailbox protocol
 type MailDir string
 
-// get this maildir as a string
-func (d MailDir) String() (str string) {
-	str = string(d)
-	return
-}
-
 // get absolute filepath for this maildir
 func (d MailDir) Filepath() (str string) {
 	str, _ = filepath.Abs(string(d))

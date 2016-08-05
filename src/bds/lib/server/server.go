@@ -13,6 +13,7 @@ import (
 	"bds/lib/i2p"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 )
@@ -146,7 +147,7 @@ func (s *Server) getUserMaildir(recip string) (d maildir.MailDir) {
 func (s *Server) gotMail(ev *MailEvent) (err error) {
 	log.Info("we got mail for ", ev.Recip, " from ", ev.Sender)
 	// deliver to maildir if set
-	if s.mail.String() != "" {
+	if s.mail != "" {
 		r := bytes.NewReader(ev.Body.Bytes())
 		// deliver
 		err = s.mail.Deliver(r)
@@ -176,14 +177,14 @@ func (s *Server) i2pSenderIsValid(addr net.Addr, from string) (valid bool) {
 	if len(fromAddr) > 0 {
 		tries := 16
 		for tries > 0 {
-			log.Info("looking up recipiant address %s", fromAddr)
+			log.Infof("looking up recipiant address %s", fromAddr)
 			raddr, err := s.session.LookupI2P(fromAddr)
 			if err == nil {
 				// lookup worked
 				valid = raddr.String() == addr.String()
 				break
 			} else {
-				log.Warn("could not lookup %s", fromAddr)
+				log.Warnf("could not lookup %s", fromAddr)
 				tries --
 			}
 		}
@@ -373,6 +374,7 @@ func (s *Server) ReloadConfig() (err error) {
 	}
 	str, _ := s.l.GetConfigOpt("maildir")
 	if len(str) > 0 {
+		str, _ = filepath.Abs(str)
 		log.Info("Using maildir at ", str)
 		s.mail = maildir.MailDir(str)
 		err = s.mail.Ensure()
