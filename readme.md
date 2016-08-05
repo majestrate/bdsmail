@@ -9,9 +9,10 @@ Brain Dead Simple Mail Server
 
 Dependancies:
 
+* luajit
+* go 1.6 with c compiler
 * git
 * make
-* go 1.6 with c compiler
 * i2p with SAM enabled
 
 To build the daemon do:
