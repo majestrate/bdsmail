@@ -1,29 +1,24 @@
-![logo](https://github.com/majestrate/bdsmail/raw/master/contrib/assets/logo.png "logo")
+![logo](logo.png "logo")
 
 Brain Dead Simple Mail Server
 
 
 ## This software is still in heavy development ##
 
-## Usage ##
-
-To use this software you need to own a domain.
-
-If you're lazy and/or cheap sign up for a free dynamic dns with
-[no-ip](https://www.noip.com/) or a related provider.
-
-
 ### Building From Source ###
 
-The only build dependancy is go 1.6
+Dependancies:
 
-    # apt install golang-1.6
+* git
+* make
+* go 1.6 with c compiler
 
 To build the daemon do:
 
+    #!bash
     $ git clone https://github.com/majestrate/bdsmail
     $ cd bdsmail
-    $ ./build.sh
+    $ make
 
 This will yield 2 executables `bdsmail` and `bdsconfig`
 
@@ -33,33 +28,25 @@ This will yield 2 executables `bdsmail` and `bdsconfig`
 
 To generate an initial configuration file run the following:
 
-    $ ./bdsconfig yourdomain.tld > bdsmail.lua
+    #!bash
+    $ ./bin/bdsconfig > config.lua
 
 ### Running ###
 
-Copy `assets` `bdsmail` and `bdsmail.lua` to the machine that `yourdomain.tld` points to in 1 directory.
-
-Then on that machine run the mail server:
-
-    $ cd /path/to/where/you/put/the/files
-    $ ./bdsmail bdsmail.lua
-
-Finnally, forward port 25 to 2525 so that inbound mail reaches the mail server (requires root)
-
-    # iptables -t nat -A PREROUTING -i eth0 -p tcp --dport 25 -j REDIRECT --to-port 2525
-
-If everything went smoothly, anyone on the internet can email `admin@yourdomain.tld` now.
+    #!bash
+    $ ./bin/maild config.lua
 
 ## Features ##
 
 ### Current ###
 
-* brain dead simple configuration (see config.example.lua)
-* brain dead simple database backend (sqlite3)
+* brain dead simple self hosted i2p mail
+* brain dead simple configuration (see config.lua.example)
 * brain dead simple license (MIT)
 
 ### Near Future ###
 
+* brain dead simple database backend (sqlite3)
 * brain dead simple tls enabled by default
 * brain dead simple smtp access
 * brain dead simple pop3 access
