@@ -9,5 +9,13 @@ bin/maild
 # config files
 *.lua
 
+# sqlite databases
+*.sqlite
+*.db
+
 # go build files
 pkg/
+
+# private keys
+*.dat
+

@@ -384,10 +384,22 @@ func (s *Server) tryDevilevery(recip, from string, body []byte) error {
 func (s *Server) Stop() {
 	close(s.chnl)
 	s.luamtx.Lock()
-	s.l.Close()
-	s.maillistener.Close()
-	s.smtplistener.Close()
-	s.weblistener.Close()
+	if s.maillistener != nil {
+		s.maillistener.Close()
+		s.maillistener = nil
+	}
+	if s.smtplistener != nil {
+		s.smtplistener.Close()
+		s.smtplistener = nil
+	}
+	if s.weblistener != nil {
+		s.weblistener.Close()
+		s.weblistener = nil
+	}
+	if s.l != nil {
+		s.l.Close()
+		s.l = nil
+	}
 	s.luamtx.Unlock()
 	log.Info("Server Stopped")
 }
