@@ -16,7 +16,6 @@ Dependancies:
 
 To build the daemon do:
 
-    #!bash
     $ git clone https://github.com/majestrate/bdsmail
     $ cd bdsmail
     $ make
@@ -29,12 +28,10 @@ This will yield 2 executables `bdsmail` and `bdsconfig`
 
 To generate an initial configuration file run the following:
 
-    #!bash
     $ ./bin/bdsconfig > config.lua
 
 ### Running ###
 
-    #!bash
     $ ./bin/maild config.lua
 
 ## Features ##
