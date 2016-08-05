@@ -8,16 +8,14 @@ import (
 	"bds/lib/db"
 	"bds/lib/lua"
 	"bds/lib/maildir"
+	"bds/lib/sendmail"
 	"bds/lib/smtp"
 	"bds/lib/i2p"
-	"io"
 	"net"
 	"net/http"
 	"strings"
 	"sync"
-	"time"
 )
-
 // handler of mail messages
 type MailHandler interface {
 	// we got a mail message
@@ -60,6 +58,8 @@ type Server struct {
 	dao db.DB
 	// web ui
 	webHandler http.Handler
+	// mail sender
+	mailer *sendmail.Mailer
 }
 
 func (s *Server) Bind() (err error) {
@@ -146,7 +146,7 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 		err = s.mail.Deliver(r)
 	}
 	if s.Handler != nil {
-		go s.Handler.GotMail(ev)
+		s.Handler.GotMail(ev)
 	}
 	return
 }
@@ -294,90 +294,39 @@ func (s *Server) handleInetMail(remote net.Addr, from string, to []string, body 
 	log.Debugf("handle send mail from %s", remote)
 	us := parseFromI2PAddr(from)
 	if us == s.inserv.Hostname || us == s.session.B32() {
-	
 
+		var jobs []*sendmail.DeliverJob
+		// channel to connect channels to close
+		chnl := make(chan chan bool)
+		
 		// deliver to all
 		for _, recip := range to {
 			if ! strings.HasSuffix(recip, ".i2p") {
 				log.Warnf("Not delivering %s as it's not inside i2p", recip)
 				continue
 			}
-			go func(recipiant string, data []byte) {
-				log.Debugf("devlivering mail to %s", recipiant)
-				// make our own local copy of the message
-				body := make([]byte, len(data))
-				copy(body, data)
-				// TODO: don't try delivery forever
-				backoff := 1
-				for {
-					err := s.tryDevilevery(recipiant, from, body)
-					if err == nil {
-						log.Infof("Mail devilvered to %s", recipiant)
-						return
-					}
-					d := time.Duration(backoff) * time.Second
-					log.Warnf("Mail delivery to %s failed, waiting for %s: %s", recipiant, d, err.Error())
-					// exponential backoff
-					time.Sleep(d)
-					backoff *= 2
-					// limit backoff
-					if backoff > 1024 {
-						log.Errorf("failed to deliver to %s", recipiant)
-						return
-					}
+			// fire off delivery job
+			d := s.mailer.Deliver(recip, from, body)
+			jobs = append(jobs, d)
+			// collect job
+			go func (j *sendmail.DeliverJob) {
+				if <- j.Result {
+					// successful delivery
 				}
-			}(recip, body)
+				chnl <- j.Result
+			}(d)
 		}
+		// collect delivery jobs
+		l := len(jobs)
+		for l > 0 {
+			c := <- chnl
+			close(c)
+			l --
+		}
+		
 	} else {
 		log.Errorf("bad outbound mail from %s", us)
 	}
-}
-
-// try deliverying mail to recipiant
-func (s *Server) tryDevilevery(recip, from string, body []byte) error {
-	addr := parseFromI2PAddr(recip)
-	log.Debugf("dial out to %s", addr)
-	conn, err := s.dial("tcp", addr)
-	if err == nil {
-		// connected gud
-		cl, err := smtp.NewClient(conn, addr)
-		if err != nil {
-			// failed to connect to smtp server
-			return errors.New("failed to speak smtp with "+addr)
-		} else {
-			// good now send hello
-			err = cl.Hello(s.inserv.Hostname)
-			if err == nil {
-				// defer client quit
-				defer cl.Quit()
-				// hello sent
-				// now let's tell them we have mail
-				err = cl.Mail(from)
-				if err == nil {
-					// we told them we have mail
-					err = cl.Rcpt(recip)
-					
-					if err != nil {
-						log.Errorf("error sending recpt to %s, %s", addr, err)
-						return err
-					}
-					if err == nil {
-						// sending recip was gud
-						var wr io.WriteCloser
-						// now try to write body
-						wr, err = cl.Data()
-						n := 0
-						// write full
-						for n < len(body) && err == nil {
-							n, err = wr.Write(body[:n])
-						}
-						wr.Close()
-					}
-				}
-			}
-		}
-	}
-	return err
 }
 
 // stop server
@@ -396,6 +345,11 @@ func (s *Server) Stop() {
 		s.weblistener.Close()
 		s.weblistener = nil
 	}
+	if s.mailer != nil {
+		s.mailer.Quit()
+		s.mailer = nil
+	}
+	
 	if s.l != nil {
 		s.l.Close()
 		s.l = nil
