@@ -12,6 +12,7 @@ Dependancies:
 * git
 * make
 * go 1.6 with c compiler
+* i2p with SAM enabled
 
 To build the daemon do:
 
