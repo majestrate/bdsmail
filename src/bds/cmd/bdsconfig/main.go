@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -13,7 +14,7 @@ func main() {
 	bindmail := "127.0.0.1:2525"
 	bindweb := "127.0.0.1:8888"
 	maildir := "mail"
-	asset_dir := "./contrib/assets"
+	asset_dir := filepath.Join(".", "contrib", "assets")
 	i2paddr := "127.0.0.1:7656"
 	keyfile := "bdsmail-privkey.dat"
 	
