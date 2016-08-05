@@ -91,13 +91,13 @@ func (d *DeliverJob) run() {
 
 // try delivery
 func (d *DeliverJob) tryDeliver(cl *smtp.Client) (err error) {
-	// recpt to
-	err = cl.Rcpt(d.recip)
+	// mail from
+	err = cl.Mail(d.from)
 	if err != nil {
 		return
 	}
-	// mail from
-	err = cl.Mail(d.from)
+	// recpt to
+	err = cl.Rcpt(d.recip)
 	if err != nil {
 		return
 	}
