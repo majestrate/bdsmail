@@ -20,9 +20,6 @@ To build the daemon do:
     $ cd bdsmail
     $ make
 
-This will yield 2 executables `bdsmail` and `bdsconfig`
-
-
 ### Configuring ###
 
 
