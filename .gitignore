@@ -1,8 +1,13 @@
+# emacs files
 *~
+*\#*
 
 # binary files
-bdsconfig
-bdsmail
+bin/bdsconfig
+bin/maild
 
-# gopath
-go/
+# config files
+*.lua
+
+# go build files
+pkg/

@@ -1,4 +1,0 @@
-//
-// web ui
-//
-package web
