@@ -121,6 +121,6 @@ func (d *DeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 		return
 	}
 	// reset 
-	err = cl.Reset()
+	// err = cl.Reset()
 	return
 }
