@@ -12,10 +12,12 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"net"
 	"net/http"
+	"net/textproto"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"time"
 )
 
 // handler of mail messages
@@ -247,6 +249,15 @@ func (s *Server) Run() {
 		}
 	}()
 
+	// run outbound mail flusher
+	go func() {
+		for s.mailer != nil {
+			s.flushOutboundMailQueue()
+			time.Sleep(time.Second * 10)
+		}
+		log.Info("outbound mail flusher exited")
+	}()
+
 	log.Debug("run mail")
 	for {
 		// filtering
@@ -280,46 +291,82 @@ func (s *Server) allowRecip(recip string) (allow bool) {
 	return
 }
 
+// send all pending outbound messages
+func (s *Server) flushOutboundMailQueue() {
+	log.Debug("flush outbound messages")
+	msgs, err := s.inserv.MailDir.ListNew()
+	if err == nil {
+		for _, msg := range msgs {
+			f, err := os.Open(msg.Filepath())
+			if err == nil {
+				c := textproto.NewConn(f)
+				defer c.Close()
+				hdr, err := c.ReadMIMEHeader()
+				if err == nil {
+					var to []string
+					var from string
+					from = hdr.Get("From")
+					for _, h := range []string{"To", "Cc", "Bcc"} {
+						v, ok := hdr[h]
+						if ok {
+							to = append(to, v...)
+						}
+					}
+					s.sendOutboundMessage(from, to, msg.Filepath())
+				}
+			}
+		}
+	}
+}
+
+// send 1 outbound message
+func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
+	log.Info("Sending outbound mail %s", fpath)
+	var jobs []*sendmail.DeliverJob
+	// channel to connect channels to close
+	chnl := make(chan chan bool)
+
+	// deliver to all
+	for _, recip := range to {
+		if !strings.HasSuffix(recip, ".i2p") {
+			log.Warnf("Not delivering %s as it's not inside i2p", recip)
+			continue
+		}
+		// fire off delivery job
+		d := s.mailer.Deliver(recip, from, fpath)
+		jobs = append(jobs, d)
+		// collect job
+		go func(j *sendmail.DeliverJob) {
+			if <-j.Result {
+				// successful delivery
+				log.Infof("mail to %s successfully delivered", recip)
+			}
+			chnl <- j.Result
+		}(d)
+	}
+	// collect delivery jobs
+	l := len(jobs)
+	for l > 0 {
+		c := <-chnl
+		close(c)
+		l--
+	}
+	// remove file
+	os.Remove(fpath)
+}
+
 // handle mail for sending from inet to i2p
 func (s *Server) handleInetMail(remote net.Addr, from string, to []string, fpath string) {
 	log.Debugf("handle send mail from %s", remote)
 	us := parseFromI2PAddr(from)
 	if us == s.inserv.Hostname || us == s.session.B32() {
-
-		var jobs []*sendmail.DeliverJob
-		// channel to connect channels to close
-		chnl := make(chan chan bool)
-
-		// deliver to all
-		for _, recip := range to {
-			if !strings.HasSuffix(recip, ".i2p") {
-				log.Warnf("Not delivering %s as it's not inside i2p", recip)
-				continue
-			}
-			// fire off delivery job
-			d := s.mailer.Deliver(recip, from, fpath)
-			jobs = append(jobs, d)
-			// collect job
-			go func(j *sendmail.DeliverJob) {
-				if <-j.Result {
-					// successful delivery
-					log.Infof("mail to %s successfully delivered", recip)
-				}
-				chnl <- j.Result
-			}(d)
-		}
-		// collect delivery jobs
-		l := len(jobs)
-		for l > 0 {
-			c := <-chnl
-			close(c)
-			l--
-		}
+		// accepted for outbound mail
+		log.Infof("outbound message queued: %s", fpath)
 	} else {
 		log.Errorf("bad outbound mail from %s", us)
+		// remove file
+		os.Remove(fpath)
 	}
-	// remove file
-	os.Remove(fpath)
 }
 
 // stop server
@@ -398,7 +445,7 @@ func (s *Server) ReloadConfig() (err error) {
 	}
 	str, _ = filepath.Abs(str)
 	log.Info("using outbond maildir at ", str)
-	s.inserv.MailDir = maildir.MailDir(str)
+	s.outserv.MailDir = maildir.MailDir(str)
 	err = s.outserv.MailDir.Ensure()
 	if err != nil {
 		return

@@ -4,6 +4,7 @@ import (
 	"bds/lib/maildir"
 	"bytes"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"io"
 	"net"
 	"net/smtp"
@@ -164,22 +165,17 @@ func (s *session) serve() {
 			fmt.Fprintf(&body, "        for <%s>; %s\r\n", to[0], now)
 			dr := c.DotReader()
 			m := s.srv.MailDir
-			if m != "" {
-				// deliver to maildir
-				mr := io.MultiReader(&body, dr)
-				var msg maildir.Message
-				msg, err = m.Deliver(mr)
-				if err == nil {
-					if s.srv.Handler != nil {
-						if err == nil {
-							s.srv.Handler(s.raddr, from, to, msg.Filepath())
-						}
-					}
-				}
+			// deliver to maildir
+			mr := io.MultiReader(&body, dr)
+			var msg maildir.Message
+			msg, err = m.Deliver(mr)
+			if err == nil && s.srv.Handler != nil {
+				go s.srv.Handler(s.raddr, from, to, msg.Filepath())
 			}
 			if err == nil {
 				c.PrintfLine("250 Ok: Delivered")
 			} else {
+				log.Error("smtp server error: %s", err.Error())
 				c.PrintfLine("500 Error delivering message: %s", err.Error())
 			}
 			from = ""
