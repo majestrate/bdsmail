@@ -335,17 +335,11 @@ func (s *Server) flushOutboundMailQueue() {
 				if err == nil {
 					var to []string
 					var from string
-					trim := func(r rune) bool {
-						return r == '>' || r == '<'
-					}
 					from = hdr.Get("From")
-					from = strings.TrimFunc(from, trim)
 					for _, h := range []string{"To", "Cc", "Bcc"} {
 						vs, ok := hdr[h]
 						if ok {
-							for _, v := range vs {
-								to = append(to, strings.TrimFunc(v, trim))
-							}
+							to = append(to, vs...)
 						}
 					}
 					c.Close()
