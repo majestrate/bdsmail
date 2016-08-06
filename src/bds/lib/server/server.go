@@ -251,6 +251,7 @@ func (s *Server) Run() {
 
 	// run outbound mail flusher
 	go func() {
+		log.Info("outbound mail flusher started")
 		for s.mailer != nil {
 			s.flushOutboundMailQueue()
 			time.Sleep(time.Second * 10)
@@ -294,28 +295,38 @@ func (s *Server) allowRecip(recip string) (allow bool) {
 // send all pending outbound messages
 func (s *Server) flushOutboundMailQueue() {
 	log.Debug("flush outbound messages")
-	msgs, err := s.inserv.MailDir.ListNew()
+	msgs, err := s.outserv.MailDir.ListNew()
 	if err == nil {
+		log.Debugf("%d messages to send in", len(msgs), s.inserv.MailDir)
 		for _, msg := range msgs {
 			f, err := os.Open(msg.Filepath())
 			if err == nil {
 				c := textproto.NewConn(f)
-				defer c.Close()
 				hdr, err := c.ReadMIMEHeader()
 				if err == nil {
 					var to []string
 					var from string
-					from = hdr.Get("From")
+					from = strings.Trim(strings.Trim(hdr.Get("From"), ">"), "<")
 					for _, h := range []string{"To", "Cc", "Bcc"} {
-						v, ok := hdr[h]
+						vs, ok := hdr[h]
 						if ok {
-							to = append(to, v...)
+							for _, v := range vs {
+								to = append(to, strings.Trim(strings.Trim(v, ">"), "<"))
+							}
 						}
 					}
+					c.Close()
 					s.sendOutboundMessage(from, to, msg.Filepath())
+				} else {
+					log.Errorf("bad outboud message %s: %s", msg.Filepath(), err.Error())
+					c.Close()
 				}
+			} else {
+				log.Errorf("no such outbound message %s: %s", msg.Filepath(), err.Error())
 			}
 		}
+	} else {
+		log.Errorf("failed to find new messages in %s: %s", s.inserv.MailDir, err.Error())
 	}
 }
 

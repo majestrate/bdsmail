@@ -140,12 +140,14 @@ func (d MailDir) Deliver(body io.Reader) (msg Message, err error) {
 // list messages in subdirectory
 func (d MailDir) listDir(sd string) (msgs []Message, err error) {
 	var f *os.File
-	f, err = os.Open(filepath.Join(d.Filepath(), sd))
+	fp := filepath.Join(d.Filepath(), sd)
+	f, err = os.Open(fp)
 	if err == nil {
 		defer f.Close()
 		var files []string
 		files, err = f.Readdirnames(0)
 		for _, mf := range files {
+			mf = filepath.Join(fp, mf)
 			msgs = append(msgs, Message(mf))
 		}
 	}
