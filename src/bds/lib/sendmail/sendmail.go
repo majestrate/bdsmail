@@ -12,6 +12,7 @@ import (
 type Bouncer func(string, string, error)
 
 type connection struct {
+	addr   string
 	cl     *smtp.Client
 	access sync.RWMutex
 }
@@ -52,6 +53,36 @@ func NewMailer() *Mailer {
 	return &Mailer{
 		conns: make(map[string]*connection),
 	}
+}
+
+// call a visitor for each connection in connection poll
+func (s *Mailer) foreach(visitor func(*smtp.Client) error) {
+	var conns []*connection
+	s.cmtx.Lock()
+	for _, conn := range s.conns {
+		conns = append(conns, conn)
+	}
+	s.cmtx.Unlock()
+	for _, conn := range conns {
+		// in paralell
+		go func(c *connection, v func(*smtp.Client) error) {
+			err := c.visit(v)
+			if err != nil {
+				// remove connection on error
+				s.delConn(c.addr)
+			}
+		}(conn, visitor)
+	}
+}
+
+// send keepalive to all connections in pool
+func (s *Mailer) KeepAlive() {
+	s.foreach(func(cl *smtp.Client) error {
+		// send NOOP command and read response
+		cl.Text.PrintfLine("NOOP")
+		_, err := cl.Text.ReadLine()
+		return err
+	})
 }
 
 // delete connection from pool
@@ -101,7 +132,8 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 				return
 			}
 			sc = &connection{
-				cl: cl,
+				cl:   cl,
+				addr: addr,
 			}
 			// success
 			s.cmtx.Lock()
