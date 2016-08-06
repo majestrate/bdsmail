@@ -163,6 +163,7 @@ func (p *pop3Session) handleTransactionLine(line string) (err error) {
 			if err == nil && (idx > 0 && idx <= len(p.msgs)) {
 				// valid, add it to delete
 				p.dels = append(p.dels, p.msgs[idx-1])
+				p.OK("")
 			} else {
 				// invalid
 				err = p.Error(err.Error())
