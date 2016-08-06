@@ -1,8 +1,8 @@
 package db
 
 import (
-	"github.com/go-xorm/xorm"
 	"bds/lib/model"
+	"github.com/go-xorm/xorm"
 	_ "github.com/mattn/go-sqlite3"
 )
 

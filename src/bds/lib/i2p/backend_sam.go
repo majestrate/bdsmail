@@ -6,7 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
-  "net"
+	"net"
 	"os"
 	"strconv"
 	"strings"
@@ -41,7 +41,7 @@ func (sc *samConn) Read(d []byte) (n int, err error) {
 	n, err = sc.c.Read(d)
 	return
 }
- 
+
 // implements net.Conn
 func (sc *samConn) SetDeadline(t time.Time) (err error) {
 	err = sc.c.SetDeadline(t)
@@ -65,7 +65,6 @@ func (sc *samConn) Write(d []byte) (n int, err error) {
 	n, err = sc.c.Write(d)
 	return
 }
- 
 
 type samPacketConn struct {
 	// sam udp addr
@@ -118,7 +117,7 @@ func (s *samPacketConn) WriteTo(d []byte, to net.Addr) (n int, err error) {
 	// format is <base64address>\n<payload>
 	a := to.String()
 	l := len(a)
-	sd := make([]byte, len(d) + 1 + l)
+	sd := make([]byte, len(d)+1+l)
 	copy(sd[:], []byte(a))
 	sd[l] = 10
 	copy(sd[1+l:], d)
@@ -145,7 +144,7 @@ func (s *samPacketConn) ReadFrom(d []byte) (n int, addr net.Addr, err error) {
 		i := bytes.Index(b[:], []byte{10})
 		if i > 1 {
 			addr = I2PAddr(string(b[:i+1]))
-			d = b[i+1:rn]
+			d = b[i+1 : rn]
 		}
 	}
 	return
@@ -232,7 +231,6 @@ func (s *samSession) LocalAddr() net.Addr {
 	return s.k.addr
 }
 
-
 // make new connection
 func (s *samSession) connect(a string) (c net.Conn, err error) {
 	if a == "" {
@@ -287,7 +285,7 @@ func (s *samSession) EnsureKeyfile(fname string) (err error) {
 				var line string
 				line, err = r.ReadString(10)
 				sc := bufio.NewScanner(strings.NewReader(line))
-				sc.Split(bufio.ScanWords)				
+				sc.Split(bufio.ScanWords)
 				k := new(samKeys)
 				// parse result
 				for sc.Scan() {
@@ -304,7 +302,7 @@ func (s *samSession) EnsureKeyfile(fname string) (err error) {
 					} else {
 						// error
 						k = nil
-						err = errors.New("failed to parse generated keys: "+t)
+						err = errors.New("failed to parse generated keys: " + t)
 					}
 				}
 				if err == nil {
@@ -319,7 +317,7 @@ func (s *samSession) EnsureKeyfile(fname string) (err error) {
 					}
 					// clear keys
 				}
-				k = nil 
+				k = nil
 			}
 			// close connection to router
 			c.Close()
@@ -355,13 +353,13 @@ func (s *samSession) EnsureKeyfile(fname string) (err error) {
 		}
 	}
 	// err != nil if file could not be opened or keys could not be generated
-  return
+	return
 }
 
 // implements net.Listener
 func (s *samSession) Accept() (c net.Conn, err error) {
 	var nc net.Conn
-  nc, err = s.connect("")
+	nc, err = s.connect("")
 	if err == nil {
 		_, err = fmt.Fprintf(nc, "STREAM ACCEPT ID=%s SILENT=false\n", s.name)
 		if err == nil {
@@ -380,7 +378,7 @@ func (s *samSession) Accept() (c net.Conn, err error) {
 						return
 					}
 				} else {
-					err = errors.New("invalid line: "+line)
+					err = errors.New("invalid line: " + line)
 				}
 			}
 		}
@@ -392,23 +390,23 @@ func (s *samSession) Accept() (c net.Conn, err error) {
 
 // implements net.Listener and net.PacketConn
 func (s *samSession) Addr() net.Addr {
-  return s.k.addr
+	return s.k.addr
 }
 
 // implements net.Listener and net.PacketConn
 func (s *samSession) Close() (err error) {
 	err = s.c.Close()
-  return
+	return
 }
 
 // implements i2p.Session
 func (s *samSession) B32() string {
-  return s.k.addr.DestHash().String()
+	return s.k.addr.DestHash().String()
 }
 
 // implements i2p.Session
 func (s *samSession) Dial(network, addr string) (c net.Conn, err error) {
-  c, err = s.connect("")
+	c, err = s.connect("")
 	if err == nil {
 		// connected
 		var a I2PAddr
@@ -430,7 +428,7 @@ func (s *samSession) Dial(network, addr string) (c net.Conn, err error) {
 			a = I2PAddr(addr)
 		} else {
 			// invalid address
-			err = errors.New("invalid address: "+addr)
+			err = errors.New("invalid address: " + addr)
 			c.Close()
 			c = nil
 			return
@@ -480,13 +478,13 @@ func (s *samSession) Dial(network, addr string) (c net.Conn, err error) {
 			c = nil
 		}
 	}
-  return
+	return
 }
 
 // implements i2p.Session
 func (s *samSession) Lookup(name string) (a net.Addr, err error) {
-  a, err = s.LookupI2P(name)
-  return
+	a, err = s.LookupI2P(name)
+	return
 }
 
 func (s *samSession) LookupI2P(name string) (a I2PAddr, err error) {
@@ -547,7 +545,6 @@ func newSession(name string) (s *samSession) {
 	return
 }
 
-
 func newSessionEasy(addr, keyfile string) (s *samSession, err error) {
 	name := randStr(10)
 	s = newSession(name)
@@ -555,12 +552,12 @@ func newSessionEasy(addr, keyfile string) (s *samSession, err error) {
 	s.c, err = s.connect(addr)
 	if err == nil {
 		err = s.EnsureKeyfile(keyfile)
-    if err == nil {
+		if err == nil {
 			// we gud
 			return
-		}	
+		}
 		s.Close()
-  }
+	}
 	s = nil
 	return
 }
@@ -581,14 +578,14 @@ func NewPacketSessionEasy(addr, keyfile string) (session PacketSession, err erro
 	var s *samSession
 	s, err = newSessionEasy(addr, keyfile)
 	if err == nil {
-		// parse addresses 
+		// parse addresses
 		var host, port string
 		host, port, err = net.SplitHostPort(addr)
 		if err == nil {
 			var p int
 			p, err = strconv.Atoi(port)
 			if err == nil {
-				p --
+				p--
 				var ip *net.IPAddr
 				ip, err = net.ResolveIPAddr("ip", host)
 				if err == nil {
@@ -596,7 +593,7 @@ func NewPacketSessionEasy(addr, keyfile string) (session PacketSession, err erro
 					samaddr, err = net.ResolveUDPAddr("udp6", fmt.Sprintf("[%s]:%d", ip.IP.To16().String(), p))
 					if err == nil {
 						// find address that fits sam address
-						var ifaddrs []net.Addr 
+						var ifaddrs []net.Addr
 						ifaddrs, err = net.InterfaceAddrs()
 						if err == nil {
 							for _, ifaddr := range ifaddrs {
@@ -608,7 +605,7 @@ func NewPacketSessionEasy(addr, keyfile string) (session PacketSession, err erro
 									return
 								}
 							}
-							err = errors.New("cannot find network address for "+host)
+							err = errors.New("cannot find network address for " + host)
 						}
 					}
 				}
@@ -620,5 +617,6 @@ func NewPacketSessionEasy(addr, keyfile string) (session PacketSession, err erro
 
 // backwards compat
 var NewSessionEasy = NewStreamSessionEasy
+
 // backwards compat
 //var NewSession = NewStreamSession

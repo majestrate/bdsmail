@@ -1,7 +1,7 @@
 package i2p
 
 import (
-  "net"
+	"net"
 )
 
 // a session with an i2p router
@@ -22,11 +22,11 @@ type StreamSession interface {
 	Session
 	// implements net.Listener
 	net.Listener
-  // Dial out to i2p from this session
-  // same api as net.Dialer.Dial
+	// Dial out to i2p from this session
+	// same api as net.Dialer.Dial
 	// does not dial out to anything except i2p addresses
 	// will fail if attempting to connect to something not accessable via the i2p network layer
-  Dial(network, addr string) (net.Conn, error)
+	Dial(network, addr string) (net.Conn, error)
 }
 
 //

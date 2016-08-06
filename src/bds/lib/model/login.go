@@ -1,10 +1,10 @@
 package model
 
 import (
-	"bytes"
-	"crypto/rand"
 	"bds/lib/base91"
 	"bds/lib/cryptonight"
+	"bytes"
+	"crypto/rand"
 	"io"
 	"strings"
 )

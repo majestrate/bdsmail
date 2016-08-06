@@ -52,7 +52,7 @@ func (a I2PAddr) Base32() string {
 // decode to i2p address to raw bytes
 func (a I2PAddr) ToBytes() (d []byte, err error) {
 	buf := make([]byte, i2pB64enc.DecodedLen(len(a)))
-	_, err = i2pB64enc.Decode(buf, []byte(a)) 
+	_, err = i2pB64enc.Decode(buf, []byte(a))
 	if err == nil {
 		d = buf
 	}
@@ -63,4 +63,3 @@ func (a I2PAddr) ToBytes() (d []byte, err error) {
 func (a I2PAddr) Network() string {
 	return "I2P"
 }
-

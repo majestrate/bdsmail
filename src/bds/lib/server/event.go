@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"net"
 )
 
@@ -13,10 +12,6 @@ type MailEvent struct {
 	Recip string
 	// sender of message
 	Sender string
-	// body of message
-	Body *bytes.Buffer
-}
-
-func (ev *MailEvent) Read(d []byte) (int, error) {
-	return ev.Body.Read(d)
+	// file containg the message
+	File string
 }

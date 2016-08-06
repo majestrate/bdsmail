@@ -5,7 +5,7 @@ import (
 )
 
 // dialer function
-type Dialer func(string,string) (net.Conn, error)
+type Dialer func(string, string) (net.Conn, error)
 
 // domain name resolver function
 type Resolver func(string) (net.Addr, error)

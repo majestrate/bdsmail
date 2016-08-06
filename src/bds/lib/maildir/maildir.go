@@ -80,7 +80,8 @@ func (d MailDir) Cur(fname string) (f string) {
 }
 
 // deliver mail to this maildir
-func (d MailDir) Deliver(body io.Reader) (err error) {
+// return messsage that was delivered
+func (d MailDir) Deliver(body io.Reader) (msg Message, err error) {
 	var oldwd string
 	oldwd, err = os.Getwd()
 	if err == nil {
@@ -122,8 +123,12 @@ func (d MailDir) Deliver(body io.Reader) (err error) {
 					_, err = io.Copy(f, body)
 					f.Close()
 					if err == nil {
-						err = os.Rename(d.Temp(fname), d.New(fname))
-						// if err is nil it's delivered
+						fn := d.New(fname)
+						err = os.Rename(d.Temp(fname), fn)
+						if err == nil {
+							// delivered
+							msg = Message(fn)
+						}
 					}
 				}
 			}
@@ -223,7 +228,7 @@ func (d MailDir) IsNew(msg Message) (is bool, err error) {
 }
 
 // open message in cur directory
-func (d MailDir) OpenMessage(msg Message) (r io.ReadCloser, err error) {
-	r, err = os.Open(d.Cur(msg.Filepath()))
+func (d MailDir) OpenMessage(msg Message) (f *os.File, err error) {
+	f, err = os.Open(d.Cur(msg.Filepath()))
 	return
 }

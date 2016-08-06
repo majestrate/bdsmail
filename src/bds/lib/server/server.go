@@ -1,22 +1,23 @@
 package server
 
 import (
-	"bytes"
-	"errors"
-	"fmt"
-	log "github.com/Sirupsen/logrus"
 	"bds/lib/db"
+	"bds/lib/i2p"
 	"bds/lib/lua"
 	"bds/lib/maildir"
 	"bds/lib/sendmail"
 	"bds/lib/smtp"
-	"bds/lib/i2p"
+	"errors"
+	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"net"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 )
+
 // handler of mail messages
 type MailHandler interface {
 	// we got a mail message
@@ -37,7 +38,7 @@ type Server struct {
 	// lua interpreter core
 	l *lua.Lua
 
-	inserv *smtp.Server
+	inserv  *smtp.Server
 	outserv *smtp.Server
 	// listener for smtp recv server
 	maillistener net.Listener
@@ -67,7 +68,7 @@ func (s *Server) Bind() (err error) {
 	// we touch the lua config so lock
 	s.luamtx.Lock()
 	defer s.luamtx.Unlock()
-	
+
 	// keyfile for i2p destination
 	keyfile, ok := s.l.GetConfigOpt("i2pkeyfile")
 	if !ok {
@@ -119,18 +120,18 @@ func (s *Server) dial(net, addr string) (c net.Conn, err error) {
 		// c, err = net.Dial(net, addr)
 		err = errors.New("cannot dial outside of i2p")
 	}
-	return 
+	return
 }
 
 // queue mail to be filtered
-func (s *Server) queueMail(addr net.Addr, from string, to []string, body []byte) {
+func (s *Server) queueMail(addr net.Addr, from string, to []string, fpath string) {
 	// for each recip fire a mail event
 	for _, recip := range to {
 		ev := &MailEvent{
 			Addr:   addr,
 			Sender: from,
 			Recip:  recip,
-			Body:   bytes.NewBuffer(body),
+			File:   fpath,
 		}
 		s.chnl <- ev
 	}
@@ -146,12 +147,6 @@ func (s *Server) getUserMaildir(recip string) (d maildir.MailDir) {
 // we got mail that was not dropped by the filters
 func (s *Server) gotMail(ev *MailEvent) (err error) {
 	log.Info("we got mail for ", ev.Recip, " from ", ev.Sender)
-	// deliver to maildir if set
-	if s.mail != "" {
-		r := bytes.NewReader(ev.Body.Bytes())
-		// deliver
-		err = s.mail.Deliver(r)
-	}
 	if s.Handler != nil {
 		s.Handler.GotMail(ev)
 	}
@@ -165,7 +160,7 @@ func (s *Server) runFilter(filtername string, ev *MailEvent) int {
 	s.luamtx.Lock()
 	defer s.luamtx.Unlock()
 	log.Debug(`running filter "` + filtername + `"...`)
-	ret := s.l.CallMailFilter(filtername, ev.Addr.String(), ev.Recip, ev.Sender, ev.Body.String())
+	ret := s.l.CallMailFilter(filtername, ev.Addr.String(), ev.Recip, ev.Sender, "")
 	log.Debug(`filter "`+filtername+`" returned `, ret)
 	return ret
 }
@@ -185,7 +180,7 @@ func (s *Server) i2pSenderIsValid(addr net.Addr, from string) (valid bool) {
 				break
 			} else {
 				log.Warnf("could not lookup %s", fromAddr)
-				tries --
+				tries--
 			}
 		}
 	}
@@ -197,11 +192,11 @@ func (s *Server) i2pSenderIsValid(addr net.Addr, from string) (valid bool) {
 // checkspam filters sequentially
 func (s *Server) filterMail(ev *MailEvent) (err error) {
 	// check invalid address for i2p
-	if ! s.i2pSenderIsValid(ev.Addr, ev.Sender) {
+	if !s.i2pSenderIsValid(ev.Addr, ev.Sender) {
 		// bad address
 		return
 	}
-	
+
 	// check whitelist filter
 	if s.runFilter("whitelist", ev) == 1 {
 		// explicit whitelist
@@ -212,20 +207,18 @@ func (s *Server) filterMail(ev *MailEvent) (err error) {
 	if s.runFilter("blacklist", ev) == 1 {
 		// drop message
 		log.WithFields(log.Fields{
-			"addr":    ev.Addr,
-			"recip":   ev.Recip,
-			"sender":  ev.Sender,
-			"msgsize": ev.Body.Len(),
+			"addr":   ev.Addr,
+			"recip":  ev.Recip,
+			"sender": ev.Sender,
 		}).Info("message hit blacklist")
 		return
 	}
 	if s.runFilter("checkspam", ev) == 1 {
 		// we got a spam message
 		log.WithFields(log.Fields{
-			"addr":    ev.Addr,
-			"recip":   ev.Recip,
-			"sender":  ev.Sender,
-			"msgsize": ev.Body.Len(),
+			"addr":   ev.Addr,
+			"recip":  ev.Recip,
+			"sender": ev.Sender,
 		}).Info("message hit spam filter")
 		return
 	}
@@ -253,7 +246,7 @@ func (s *Server) Run() {
 			log.Fatal("outbound smtp died ", err)
 		}
 	}()
-	
+
 	log.Debug("run mail")
 	for {
 		// filtering
@@ -288,7 +281,7 @@ func (s *Server) allowRecip(recip string) (allow bool) {
 }
 
 // handle mail for sending from inet to i2p
-func (s *Server) handleInetMail(remote net.Addr, from string, to []string, body []byte) {
+func (s *Server) handleInetMail(remote net.Addr, from string, to []string, fpath string) {
 	log.Debugf("handle send mail from %s", remote)
 	us := parseFromI2PAddr(from)
 	if us == s.inserv.Hostname || us == s.session.B32() {
@@ -296,19 +289,19 @@ func (s *Server) handleInetMail(remote net.Addr, from string, to []string, body 
 		var jobs []*sendmail.DeliverJob
 		// channel to connect channels to close
 		chnl := make(chan chan bool)
-		
+
 		// deliver to all
 		for _, recip := range to {
-			if ! strings.HasSuffix(recip, ".i2p") {
+			if !strings.HasSuffix(recip, ".i2p") {
 				log.Warnf("Not delivering %s as it's not inside i2p", recip)
 				continue
 			}
 			// fire off delivery job
-			d := s.mailer.Deliver(recip, from, body)
+			d := s.mailer.Deliver(recip, from, fpath)
 			jobs = append(jobs, d)
 			// collect job
-			go func (j *sendmail.DeliverJob) {
-				if <- j.Result {
+			go func(j *sendmail.DeliverJob) {
+				if <-j.Result {
 					// successful delivery
 					log.Infof("mail to %s successfully delivered", recip)
 				}
@@ -318,14 +311,15 @@ func (s *Server) handleInetMail(remote net.Addr, from string, to []string, body 
 		// collect delivery jobs
 		l := len(jobs)
 		for l > 0 {
-			c := <- chnl
+			c := <-chnl
 			close(c)
-			l --
+			l--
 		}
-		
 	} else {
 		log.Errorf("bad outbound mail from %s", us)
 	}
+	// remove file
+	os.Remove(fpath)
 }
 
 // stop server
@@ -374,15 +368,42 @@ func (s *Server) ReloadConfig() (err error) {
 		return
 	}
 	str, _ := s.l.GetConfigOpt("maildir")
-	if len(str) > 0 {
-		str, _ = filepath.Abs(str)
-		log.Info("Using maildir at ", str)
-		s.mail = maildir.MailDir(str)
-		err = s.mail.Ensure()
-		if err != nil {
-			return
-		}
+	if len(str) == 0 {
+		str = "mail"
 	}
+
+	str, _ = filepath.Abs(str)
+	log.Info("Using user maildir at ", str)
+	s.mail = maildir.MailDir(str)
+	err = s.mail.Ensure()
+	if err != nil {
+		return
+	}
+
+	str, _ = s.l.GetConfigOpt("inbound_maildir")
+	if len(str) == 0 {
+		str = "inbound"
+	}
+	str, _ = filepath.Abs(str)
+	log.Info("Using inbound maildir at ", str)
+	s.inserv.MailDir = maildir.MailDir(str)
+	err = s.inserv.MailDir.Ensure()
+	if err != nil {
+		return
+	}
+
+	str, _ = s.l.GetConfigOpt("outbound_maildir")
+	if len(str) == 0 {
+		str = "outbound"
+	}
+	str, _ = filepath.Abs(str)
+	log.Info("using outbond maildir at ", str)
+	s.inserv.MailDir = maildir.MailDir(str)
+	err = s.outserv.MailDir.Ensure()
+	if err != nil {
+		return
+	}
+
 	str, _ = s.l.GetConfigOpt("domain")
 	if len(str) == 0 {
 		if s.session != nil {
@@ -403,7 +424,7 @@ func (s *Server) ReloadConfig() (err error) {
 		log.Info("Initialize database ", str)
 		var dao db.DB
 		dao, err = db.NewDB(str)
-		if err == nil {		
+		if err == nil {
 			err = dao.Ensure()
 			if err == nil {
 				log.Info("Database ready")

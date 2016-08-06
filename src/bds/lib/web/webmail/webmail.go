@@ -10,7 +10,7 @@ type WebMail struct {
 }
 
 func (m *WebMail) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	
+
 }
 
 func New(dao db.DB) *WebMail {

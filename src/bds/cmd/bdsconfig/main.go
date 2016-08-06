@@ -17,7 +17,7 @@ func main() {
 	asset_dir := filepath.Join(".", "contrib", "assets")
 	i2paddr := "127.0.0.1:7656"
 	keyfile := "bdsmail-privkey.dat"
-	
+
 	if len(os.Args) > 1 {
 		domain = os.Args[1]
 	}

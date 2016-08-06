@@ -1,10 +1,11 @@
 package sendmail
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"fmt"
+	log "github.com/Sirupsen/logrus"
 	"io"
 	"net/smtp"
+	"os"
 	"strings"
 	"time"
 )
@@ -12,17 +13,17 @@ import (
 // job for delivering mail
 type DeliverJob struct {
 	unlimited bool
-	cancel bool
-	retries int
-	
-	bounce Bouncer
-	visit func(func(*smtp.Client) error) error
-	delivered func(string, string)
-	
-	recip string
-	from string
+	cancel    bool
+	retries   int
 
-	body []byte
+	bounce    Bouncer
+	visit     func(func(*smtp.Client) error) error
+	delivered func(string, string)
+
+	recip string
+	from  string
+
+	fpath string
 
 	Result chan bool
 }
@@ -30,19 +31,19 @@ type DeliverJob struct {
 func extractAddr(email string) (addr string) {
 	if strings.HasSuffix(email, "@") {
 		addr = "localhost"
-	} else {	
+	} else {
 		idx_at := strings.Index(email, "@")
 		if strings.HasSuffix(email, ".b32.i2p") {
 			addr = email[idx_at+1:]
 		} else if strings.HasSuffix(email, ".i2p") {
-			idx_i2p := strings.LastIndex(email, ".i2p")    
+			idx_i2p := strings.LastIndex(email, ".i2p")
 			addr = fmt.Sprintf("smtp.%s.i2p", email[idx_at+1:idx_i2p])
 		} else {
 			addr = email[idx_at+1:]
 		}
 	}
-  addr = strings.Trim(addr, ",= \t\r\n\f\b")
-  return
+	addr = strings.Trim(addr, ",= \t\r\n\f\b")
+	return
 
 }
 
@@ -70,7 +71,7 @@ func (d *DeliverJob) run() {
 			return
 		} else {
 			// failed to deliver
-			tries ++
+			tries++
 			log.Warnf("failed to deliver message to %s from %s: %s", d.recip, d.from, err.Error())
 			sec *= 2
 			if sec > 1024 {
@@ -91,6 +92,13 @@ func (d *DeliverJob) run() {
 
 // try delivery
 func (d *DeliverJob) tryDeliver(cl *smtp.Client) (err error) {
+	var f *os.File
+	// open file
+	f, err = os.Open(d.fpath)
+	if err != nil {
+		return
+	}
+	defer f.Close()
 	// mail from
 	err = cl.Mail(d.from)
 	if err != nil {
@@ -107,11 +115,8 @@ func (d *DeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 	if err != nil {
 		return
 	}
-	// ... full write
-	n := 0
-	for n < len(d.body) && err == nil {
-		n, err = wr.Write(d.body[n:])
-	}
+	// write body
+	_, err = io.Copy(wr, f)
 	if err != nil {
 		return
 	}
@@ -120,7 +125,7 @@ func (d *DeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 	if err != nil {
 		return
 	}
-	// reset 
+	// reset
 	// err = cl.Reset()
 	return
 }

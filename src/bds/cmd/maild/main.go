@@ -1,8 +1,8 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
 	"bds/lib/server"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"os/signal"
 	"syscall"

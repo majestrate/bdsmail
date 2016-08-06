@@ -2,21 +2,19 @@ package sendmail
 
 import (
 	log "github.com/Sirupsen/logrus"
-	"net/smtp"
 	"net"
+	"net/smtp"
 	"sync"
 )
-
 
 // mail bounce handler
 // paramters are (recipiant email address, from email address, network related error or nil for regular bounce)
 type Bouncer func(string, string, error)
 
 type connection struct {
-	cl *smtp.Client
+	cl     *smtp.Client
 	access sync.RWMutex
 }
-
 
 // safely visit a conection with a function
 func (c *connection) visit(visitor func(*smtp.Client) error) (err error) {
@@ -24,6 +22,10 @@ func (c *connection) visit(visitor func(*smtp.Client) error) (err error) {
 	err = visitor(c.cl)
 	c.access.Unlock()
 	return
+}
+
+func (c *connection) Quit() {
+	c.cl.Quit()
 }
 
 // mail delivery
@@ -43,13 +45,12 @@ type Mailer struct {
 	conns map[string]*connection
 	// mutex for conns
 	cmtx sync.RWMutex
-	
 }
 
 // create a new pooled mailer
 func NewMailer() *Mailer {
 	return &Mailer{
-		conns: make(map[string] *connection),
+		conns: make(map[string]*connection),
 	}
 }
 
@@ -57,8 +58,9 @@ func NewMailer() *Mailer {
 func (s *Mailer) delConn(addr string) {
 	s.cmtx.Lock()
 	// safe delete
-	_, ok := s.conns[addr]
+	c, ok := s.conns[addr]
 	if ok {
+		c.Quit()
 		delete(s.conns, addr)
 	}
 	s.cmtx.Unlock()
@@ -112,15 +114,15 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 
 // try delivering mail
 // returns a DeliveryJob that can be cancelled
-func (s *Mailer) Deliver(recip, from string, body []byte) (d *DeliverJob) {
-	log.Infof("Delivering %d of mail to %s from %s", len(body), recip, from)
+func (s *Mailer) Deliver(recip, from, fpath string) (d *DeliverJob) {
+	log.Infof("Delivering  mail to %s from %s", recip, from)
 	dialer := s.Dial
 	if dialer == nil {
 		dialer = net.Dial
 	}
 
 	bounce := s.Bounce
-	
+
 	resolver := s.Resolve
 
 	if resolver == nil {
@@ -147,11 +149,11 @@ func (s *Mailer) Deliver(recip, from string, body []byte) (d *DeliverJob) {
 			return
 		}
 	}
-	
+
 	d = &DeliverJob{
 		unlimited: s.Retries == 0,
-		cancel: false,
-		retries: s.Retries,
+		cancel:    false,
+		retries:   s.Retries,
 		visit: func(f func(*smtp.Client) error) error {
 			r_addr := extractAddr(recip)
 			a, err := resolver(r_addr)
@@ -162,15 +164,13 @@ func (s *Mailer) Deliver(recip, from string, body []byte) (d *DeliverJob) {
 			}
 			return err
 		},
-		bounce: bounce,
-		recip: recip,
-		from: from,
-		body: make([]byte, len(body)),
-		Result: make(chan bool),
+		bounce:    bounce,
+		recip:     recip,
+		from:      from,
+		fpath:     fpath,
+		Result:    make(chan bool),
 		delivered: s.Success,
 	}
-	// copy body into deliverer
-	copy(d.body, body)
 	// run delivery in background
 	go d.run()
 	return
@@ -202,4 +202,3 @@ func (m *Mailer) Quit() {
 	}
 	m.cmtx.Unlock()
 }
-
