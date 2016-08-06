@@ -306,12 +306,16 @@ func (s *Server) flushOutboundMailQueue() {
 				if err == nil {
 					var to []string
 					var from string
-					from = strings.Trim(strings.Trim(hdr.Get("From"), ">"), "<")
+					trim := func(r rune) bool {
+						return r == '>' || r == '<'
+					}
+					from = hdr.Get("From")
+					from = strings.TrimFunc(from, trim)
 					for _, h := range []string{"To", "Cc", "Bcc"} {
 						vs, ok := hdr[h]
 						if ok {
 							for _, v := range vs {
-								to = append(to, strings.Trim(strings.Trim(v, ">"), "<"))
+								to = append(to, strings.TrimFunc(v, trim))
 							}
 						}
 					}
@@ -332,7 +336,7 @@ func (s *Server) flushOutboundMailQueue() {
 
 // send 1 outbound message
 func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
-	log.Info("Sending outbound mail %s", fpath)
+	log.Infof("Sending outbound mail %s", fpath)
 	var jobs []*sendmail.DeliverJob
 	// channel to connect channels to close
 	chnl := make(chan chan bool)
