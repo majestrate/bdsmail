@@ -1,9 +1,380 @@
 package pop3
 
+import (
+	"bds/lib/maildir"
+	"bufio"
+	"errors"
+	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"io"
+	"net"
+	"net/textproto"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type MailDirGetter interface {
+	// get a user's maildir
+	GetUserMaildir(user string) (maildir.MailDir, error)
+}
+
+type mailDirGetter string
+
+func (md mailDirGetter) GetUserMaildir(user string) (m maildir.MailDir, err error) {
+	m = maildir.MailDir(md)
+	return
+}
+
+// a maildir getter that always uses 1 directory
+func NewMailDirGetter(path string) MailDirGetter {
+	return mailDirGetter(path)
+}
+
 // pop3 server
 type Server struct {
+	// function that obtains a maildir given a user
+	GetMailDir MailDirGetter
+	// server name
+	name string
 }
 
 func New() *Server {
-	return nil
+	host, _ := os.Hostname()
+	return &Server{
+		name: host,
+	}
+}
+
+// get all messages in maildir
+func (s *Server) getMessages(user string) (msgs []maildir.Message, err error) {
+	// get user's maildir
+	var md maildir.MailDir
+	if s.GetMailDir == nil {
+		err = errors.New("could't find maildir")
+		return
+	}
+	md, err = s.GetMailDir.GetUserMaildir(user)
+	if err != nil {
+		return
+	}
+	// move new mail into cur
+	var ms []maildir.Message
+	ms, err = md.ListNew()
+	if err == nil {
+		for _, m := range ms {
+			err = md.ProcessNew(m)
+			if err != nil {
+				log.Errorf("error processing maildir: %s", err.Error())
+			}
+		}
+	}
+	// get all current files
+	msgs, err = md.ListCur()
+	return
+}
+
+func (s *Server) checkUser(user, passwd string) (allowed bool) {
+	// TODO: implement
+	allowed = true
+	return
+}
+
+func (s *Server) checkDigest(user, digest string) (allowed bool) {
+	// TODO: implement
+	allowed = true
+	return
+}
+
+// get all messages and octet count
+func (s *Server) obtainMessages(user string) (msgs []maildir.Message, o int64, err error) {
+	msgs, err = s.getMessages(user)
+	if err == nil {
+		for _, msg := range msgs {
+			var info os.FileInfo
+			info, err = os.Stat(msg.Filepath())
+			if err == nil && !info.IsDir() {
+				o += info.Size()
+			}
+		}
+	}
+	return
+}
+
+// pop3 session handler
+type pop3Session struct {
+	// network connection
+	c *textproto.Conn
+	// parent server
+	s *Server
+	// are we in transaction state?
+	transaction bool
+	// current user
+	user string
+	// messages we have in this transaction
+	msgs []maildir.Message
+	// how many octets we have for all messages
+	octs int64
+	// messages to delete
+	dels []maildir.Message
+}
+
+// run pop3 session mainloop
+func (p *pop3Session) Run() {
+	// send banner
+	err := p.c.PrintfLine("+OK POP3 Server Ready <%d.%d@%s>", os.Getpid(), time.Now().Unix(), p.s.name)
+	for err == nil {
+		var line string
+		line, err = p.c.ReadLine()
+		if err == nil {
+			if strings.ToUpper(line) == "QUIT" {
+				// check for quit command
+				err = p.OK("k bai")
+				break
+			} else if p.transaction {
+				err = p.handleTransactionLine(line)
+			} else {
+				err = p.handleLine(line)
+			}
+		}
+	}
+	if err != nil && err != io.EOF {
+		log.Errorf("error in pop3 session: %s", err.Error())
+	}
+	// close connection
+	p.c.Close()
+	// delete old messages
+	for _, msg := range p.dels {
+		os.Remove(msg.Filepath())
+	}
+}
+
+// handle line when in transaction mode
+func (p *pop3Session) handleTransactionLine(line string) (err error) {
+	var info os.FileInfo
+	var idx int
+	parts := strings.Split(line, " ")
+	cmd := strings.ToUpper(parts[0])
+	switch cmd {
+	case "DELE":
+		if len(parts) == 2 {
+			idx, err = strconv.Atoi(parts[1])
+			if err == nil && (idx > 0 && idx <= len(p.msgs)) {
+				// valid, add it to delete
+				p.dels = append(p.dels, p.msgs[idx-1])
+			} else {
+				// invalid
+				err = p.Error(err.Error())
+			}
+		}
+	case "RETR":
+		if len(parts) == 2 {
+			idx, err = strconv.Atoi(parts[1])
+			if err == nil && (idx > 0 && idx <= len(p.msgs)) {
+				// valid
+				msg := p.msgs[idx-1].Filepath()
+				var f *os.File
+				f, err = os.Open(msg)
+				if err == nil {
+					r := bufio.NewReader(f)
+					info, err = f.Stat()
+					if err == nil {
+						err = p.c.PrintfLine("+OK %d octets", info.Size())
+						for err == nil {
+							// send line
+							line, err = r.ReadString(10)
+							if err == io.EOF {
+								err = nil
+								break
+							} else if err == nil {
+								line = strings.Trim(line, "\r")
+								line = strings.Trim(line, "\n")
+								if line == "." {
+									line = " ."
+								}
+								// send line
+								err = p.c.PrintfLine(line)
+							} else {
+								// error
+								break
+							}
+						}
+					}
+					f.Close()
+					// end
+					err = p.c.PrintfLine(".")
+				} else {
+					err = p.Error(err.Error())
+				}
+			} else {
+				// invalid
+				err = p.Error("bad message")
+			}
+		} else {
+			err = p.Error("invalid syntax")
+		}
+		break
+	case "UIDL":
+		if len(parts) == 2 {
+			// 1 message
+			idx, err = strconv.Atoi(parts[1])
+			if err == nil && (idx > 0 && idx <= len(p.msgs)) {
+				// valid
+				err = p.OK(parts[1] + " " + p.msgs[idx-1].Filename())
+			} else {
+				// invalid
+				err = p.Error("bad message")
+			}
+		} else {
+			// all messages
+			p.OK("")
+			dw := p.c.DotWriter()
+			for idx, msg := range p.msgs {
+				fmt.Fprintf(dw, "%d %s\r\n", idx, msg.Filename())
+			}
+			// FLUSH :D
+			err = dw.Close()
+		}
+		// begin
+		break
+	case "STAT":
+		// begin
+		_, err = p.c.W.WriteString("+OK ")
+		if err == nil {
+			// write list
+			for idx, _ := range p.msgs {
+				_, err = fmt.Fprintf(p.c.W, "%d ", 1+idx)
+				if err != nil {
+					break
+				}
+			}
+		}
+		if err == nil {
+			// done writing list
+			err = p.c.PrintfLine("")
+		} else {
+			err = p.Error(err.Error())
+		}
+		break
+	case "LIST":
+		if len(parts) == 2 {
+			// 1 message
+			idx, err = strconv.Atoi(parts[1])
+			if err == nil {
+				if idx > 0 && idx <= len(p.msgs) {
+					info, err = os.Stat(p.msgs[idx-1].Filepath())
+					if err == nil {
+						err = p.c.PrintfLine("+OK %d %d", idx, info.Size())
+					}
+				} else {
+					// no existing message
+					err = p.Error("no such message")
+				}
+			}
+		} else {
+			// all messages
+			err = p.c.PrintfLine("+OK %d messages (%d octets)", len(p.msgs), p.octs)
+			if err == nil {
+				dw := p.c.DotWriter()
+				for i, msg := range p.msgs {
+					info, err = os.Stat(msg.Filepath())
+					if err == nil {
+						// write out entry
+						fmt.Fprintf(dw, "%d %d\r\n", i+1, info.Size())
+					} else {
+						log.Errorf("error in pop3, stat(): %s", err.Error())
+					}
+				}
+				// FLUSH IT !!! :-DDDDD
+				err = dw.Close()
+			}
+		}
+		break
+	default:
+		err = p.Error("bad command")
+	}
+	return
+}
+
+// handle 1 line of input when not in transaction mode
+func (p *pop3Session) handleLine(line string) (err error) {
+	parts := strings.Split(line, " ")
+	cmd := strings.ToUpper(parts[0])
+	switch cmd {
+	case "NOOP":
+		err = p.OK("")
+		break
+	case "APOP":
+		if len(parts) == 3 {
+			if p.s.checkDigest(parts[1], parts[2]) {
+				// load messages
+				p.msgs, p.octs, err = p.s.obtainMessages(p.user)
+				if err == nil {
+					err = p.OK("maildrop is go for access")
+					p.transaction = err == nil
+				} else {
+					err = p.Error(err.Error())
+				}
+			} else {
+				err = p.Error("permission denied")
+			}
+		} else {
+			err = p.Error("Bad APOP")
+		}
+		break
+	case "PASS":
+		if p.s.checkUser(p.user, line[5:]) {
+			p.msgs, p.octs, err = p.s.obtainMessages(p.user)
+			if err == nil {
+				err = p.c.PrintfLine("+OK %s maildrop logged in, you have %d messages (%d octets)", p.user, len(p.msgs), p.octs)
+				p.transaction = err == nil
+			} else {
+				err = p.Error(err.Error())
+			}
+		} else {
+			err = p.Error("bad login")
+		}
+		break
+	case "USER":
+		if len(parts) > 1 {
+			p.user = line[5:]
+		}
+		err = p.OK("anonymous access enabled")
+		break
+	default:
+		err = p.Error("bad command")
+	}
+	return
+}
+
+func (p *pop3Session) OK(msg string) (err error) {
+	if len(msg) == 0 {
+		err = p.c.PrintfLine("+OK")
+	} else {
+		err = p.c.PrintfLine("+OK %s", msg)
+	}
+	return
+}
+
+// send error
+func (p *pop3Session) Error(msg string) (err error) {
+	err = p.c.PrintfLine("-ERR %s", msg)
+	return
+}
+
+// serve sessions with connections accepted from a net.Listener
+func (s *Server) Serve(l net.Listener) (err error) {
+	for err == nil {
+		var c net.Conn
+		c, err = l.Accept()
+		if err == nil {
+			p := &pop3Session{
+				c: textproto.NewConn(c),
+				s: s,
+			}
+			go p.Run()
+		}
+	}
+	return
 }

@@ -1,6 +1,7 @@
 package maildir
 
 import (
+	"path/filepath"
 	"strings"
 )
 
@@ -10,8 +11,13 @@ func (m Message) Filepath() string {
 	return string(m)
 }
 
+func (m Message) Filename() (f string) {
+	_, f = filepath.Split(m.Filepath())
+	return
+}
+
 func (m Message) Name() string {
-	return strings.Split(string(m), ":")[0]
+	return strings.Split(m.Filename(), ":")[0]
 }
 
 // get flags on this message

@@ -1,4 +1,4 @@
 //
-// pop3 protocol implementation
+// pop3 server implementation
 //
 package pop3

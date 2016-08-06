@@ -169,7 +169,7 @@ func (d MailDir) ListCur() (msgs []Message, err error) {
 // process new message and move it to the cur directory
 func (d MailDir) ProcessNew(msg Message, flags ...Flag) (err error) {
 	// find message
-	fname := d.New(msg.Filepath())
+	fname := d.New(msg.Filename())
 	_, err = os.Stat(fname)
 	if err == nil {
 		// message exists and is accessable
@@ -178,10 +178,11 @@ func (d MailDir) ProcessNew(msg Message, flags ...Flag) (err error) {
 			for _, f := range flags {
 				fl += f.String()
 			}
+			// set flags
 			err = os.Rename(fname, d.Cur(fmt.Sprintf("%s:2,%s", msg.Name(), fl)))
 		} else {
-			// default to seen if no flags are specified
-			err = os.Rename(fname, d.Cur(fmt.Sprintf("%s:2,S", msg.Name())))
+			// don't touch flags
+			err = os.Rename(fname, d.Cur(msg.Filename()))
 		}
 	}
 	return
@@ -189,7 +190,7 @@ func (d MailDir) ProcessNew(msg Message, flags ...Flag) (err error) {
 
 // process message in cur and change its flags if specified
 func (d MailDir) ProcessCur(msg Message, flags ...Flag) (err error) {
-	fname := d.Cur(msg.Filepath())
+	fname := d.Cur(msg.Filename())
 	_, err = os.Stat(fname)
 	if err == nil {
 		// message exists and is accessable

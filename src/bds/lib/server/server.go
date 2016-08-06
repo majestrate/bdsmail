@@ -5,6 +5,7 @@ import (
 	"bds/lib/i2p"
 	"bds/lib/lua"
 	"bds/lib/maildir"
+	"bds/lib/pop3"
 	"bds/lib/sendmail"
 	"bds/lib/smtp"
 	"errors"
@@ -42,10 +43,13 @@ type Server struct {
 
 	inserv  *smtp.Server
 	outserv *smtp.Server
+
 	// listener for smtp recv server
 	maillistener net.Listener
 	// listener for smtp send server
 	smtplistener net.Listener
+	// listener for pop3 server
+	poplistener net.Listener
 	// stream session with i2p router
 	session i2p.StreamSession
 	// listener for web server
@@ -64,12 +68,25 @@ type Server struct {
 	webHandler http.Handler
 	// mail sender
 	mailer *sendmail.Mailer
+	// pop3 server
+	pop *pop3.Server
 }
 
 func (s *Server) Bind() (err error) {
 	// we touch the lua config so lock
 	s.luamtx.Lock()
 	defer s.luamtx.Unlock()
+
+	// bind pop3 server
+	addr, ok := s.l.GetConfigOpt("bindpop3")
+	if !ok {
+		addr = "127.0.0.1:1110"
+	}
+	log.Infof("binding pop3 server to %s", addr)
+	s.poplistener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
 
 	// keyfile for i2p destination
 	keyfile, ok := s.l.GetConfigOpt("i2pkeyfile")
@@ -251,7 +268,7 @@ func (s *Server) Run() {
 
 	// run outbound mail flusher
 	go func() {
-		log.Info("outbound mail flusher started")
+		log.Info("Outbound mail flusher started")
 		for s.mailer != nil {
 			// send keepalive messages
 			s.mailer.KeepAlive()
@@ -259,7 +276,16 @@ func (s *Server) Run() {
 			s.flushOutboundMailQueue()
 			time.Sleep(time.Second * 10)
 		}
-		log.Info("outbound mail flusher exited")
+		log.Info("Outbound mail flusher exited")
+	}()
+
+	// run pop3 server
+	go func() {
+		log.Info("Serving POP3 server")
+		err := s.pop.Serve(s.poplistener)
+		if err != nil {
+			log.Fatalf("POP3 server died: %s", err.Error())
+		}
 	}()
 
 	log.Debug("run mail")
@@ -456,6 +482,9 @@ func (s *Server) ReloadConfig() (err error) {
 	if err != nil {
 		return
 	}
+	// set pop3 server maildir getter
+	// TODO: implement per user maildirs
+	s.pop.GetMailDir = pop3.NewMailDirGetter(str)
 
 	str, _ = s.l.GetConfigOpt("outbound_maildir")
 	if len(str) == 0 {
@@ -511,6 +540,7 @@ func New() (s *Server) {
 		outserv: &smtp.Server{
 			Appname: Appname,
 		},
+		pop: pop3.New(),
 	}
 	if s.l.JIT() != nil {
 		log.Fatal("failed to initialize luajit")
