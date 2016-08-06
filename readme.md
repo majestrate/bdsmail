@@ -37,7 +37,6 @@ To generate an initial configuration file run the following:
 ### Current ###
 
 * brain dead simple self hosted i2p mail
-* brain dead simple configuration (see config.lua.example)
 * brain dead simple license (MIT)
 
 ### Near Future ###
