@@ -169,8 +169,12 @@ func (s *session) serve() {
 			mr := io.MultiReader(&body, dr)
 			var msg maildir.Message
 			msg, err = m.Deliver(mr)
-			if err == nil && s.srv.Handler != nil {
-				go s.srv.Handler(s.raddr, from, to, msg.Filepath())
+			if err == nil {
+				if s.srv.Handler == nil {
+					// no handler
+				} else {
+					go s.srv.Handler(s.raddr, from, to, msg.Filepath())
+				}
 			}
 			if err == nil {
 				c.PrintfLine("250 Ok: Delivered")

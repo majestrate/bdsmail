@@ -12,30 +12,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 )
 
-type MailDirGetter interface {
-	// get a user's maildir
-	GetUserMaildir(user string) (maildir.MailDir, error)
-}
-
-type mailDirGetter string
-
-func (md mailDirGetter) GetUserMaildir(user string) (m maildir.MailDir, err error) {
-	m = maildir.MailDir(md)
-	return
-}
-
-// a maildir getter that always uses 1 directory
-func NewMailDirGetter(path string) MailDirGetter {
-	return mailDirGetter(path)
-}
+// function that authenticates a user
+type UserAuthenticator func(string, string) (bool, error)
 
 // pop3 server
 type Server struct {
 	// function that obtains a maildir given a user
-	GetMailDir MailDirGetter
+	GetMailDir maildir.Getter
+	// login authenticator
+	Auth UserAuthenticator
 	// server name
 	name string
 }
@@ -55,7 +42,7 @@ func (s *Server) getMessages(user string) (msgs []maildir.Message, err error) {
 		err = errors.New("could't find maildir")
 		return
 	}
-	md, err = s.GetMailDir.GetUserMaildir(user)
+	md, err = s.GetMailDir.GetMailDir(user)
 	if err != nil {
 		return
 	}
@@ -76,14 +63,9 @@ func (s *Server) getMessages(user string) (msgs []maildir.Message, err error) {
 }
 
 func (s *Server) checkUser(user, passwd string) (allowed bool) {
-	// TODO: implement
-	allowed = true
-	return
-}
-
-func (s *Server) checkDigest(user, digest string) (allowed bool) {
-	// TODO: implement
-	allowed = true
+	if s.Auth != nil {
+		allowed, _ = s.Auth(user, passwd)
+	}
 	return
 }
 
@@ -123,7 +105,7 @@ type pop3Session struct {
 // run pop3 session mainloop
 func (p *pop3Session) Run() {
 	// send banner
-	err := p.c.PrintfLine("+OK POP3 Server Ready <%d.%d@%s>", os.Getpid(), time.Now().Unix(), p.s.name)
+	err := p.OK("POP3 Server Ready")
 	for err == nil {
 		var line string
 		line, err = p.c.ReadLine()
@@ -306,24 +288,6 @@ func (p *pop3Session) handleLine(line string) (err error) {
 	case "NOOP":
 		err = p.OK("")
 		break
-	case "APOP":
-		if len(parts) == 3 {
-			if p.s.checkDigest(parts[1], parts[2]) {
-				// load messages
-				p.msgs, p.octs, err = p.s.obtainMessages(p.user)
-				if err == nil {
-					err = p.OK("maildrop is go for access")
-					p.transaction = err == nil
-				} else {
-					err = p.Error(err.Error())
-				}
-			} else {
-				err = p.Error("permission denied")
-			}
-		} else {
-			err = p.Error("Bad APOP")
-		}
-		break
 	case "PASS":
 		if p.s.checkUser(p.user, line[5:]) {
 			p.msgs, p.octs, err = p.s.obtainMessages(p.user)
@@ -341,7 +305,7 @@ func (p *pop3Session) handleLine(line string) (err error) {
 		if len(parts) > 1 {
 			p.user = line[5:]
 		}
-		err = p.OK("anonymous access enabled")
+		err = p.OK("you may try login as " + p.user)
 		break
 	default:
 		err = p.Error("bad command")

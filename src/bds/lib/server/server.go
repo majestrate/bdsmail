@@ -5,12 +5,14 @@ import (
 	"bds/lib/i2p"
 	"bds/lib/lua"
 	"bds/lib/maildir"
+	"bds/lib/model"
 	"bds/lib/pop3"
 	"bds/lib/sendmail"
 	"bds/lib/smtp"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
+	"io"
 	"net"
 	"net/http"
 	"net/textproto"
@@ -56,8 +58,8 @@ type Server struct {
 	weblistener net.Listener
 	// recv mail events from handlers
 	chnl chan *MailEvent
-	// maildir storage
-	mail maildir.MailDir
+	// directory holding all users's maildirs
+	mail string
 	// lock to use to ensure 1 thread accessing lua
 	luamtx sync.RWMutex
 	// filepath to configuration
@@ -72,6 +74,7 @@ type Server struct {
 	pop *pop3.Server
 }
 
+// bind network services
 func (s *Server) Bind() (err error) {
 	// we touch the lua config so lock
 	s.luamtx.Lock()
@@ -156,16 +159,29 @@ func (s *Server) queueMail(addr net.Addr, from string, to []string, fpath string
 	}
 }
 
-// get the maildir for a recipiant
-func (s *Server) getUserMaildir(recip string) (d maildir.MailDir) {
-	// TODO: implement
-	d = s.mail
-	return
-}
-
 // we got mail that was not dropped by the filters
 func (s *Server) gotMail(ev *MailEvent) (err error) {
 	log.Info("we got mail for ", ev.Recip, " from ", ev.Sender)
+
+	// get user maildir
+	var md maildir.MailDir
+	md, err = s.dao.GetMailDir(ev.Recip)
+	if err != nil {
+		// no user use the postmaster maildir instead
+		md, _ = s.dao.GetMailDir("postmaster")
+	}
+	// deliver to the user's maildir if they have one
+	var f io.ReadCloser
+	f, err = os.Open(ev.File)
+	if err == nil {
+		var m maildir.Message
+		m, err = md.Deliver(f)
+		f.Close()
+		// delete old file
+		os.Remove(ev.File)
+		// rewrite filepath for handler call
+		ev.File = m.Filepath()
+	}
 	if s.Handler != nil {
 		s.Handler.GotMail(ev)
 	}
@@ -281,6 +297,10 @@ func (s *Server) Run() {
 
 	// run pop3 server
 	go func() {
+		if s.dao != nil {
+			s.pop.Auth = s.dao.CheckUserLogin
+			s.pop.GetMailDir = s.dao
+		}
 		log.Info("Serving POP3 server")
 		err := s.pop.Serve(s.poplistener)
 		if err != nil {
@@ -459,11 +479,15 @@ func (s *Server) ReloadConfig() (err error) {
 
 	str, _ = filepath.Abs(str)
 	log.Info("Using user maildir at ", str)
-	s.mail = maildir.MailDir(str)
-	err = s.mail.Ensure()
+	_, err = os.Stat(str)
+	if os.IsNotExist(err) {
+		err = os.Mkdir(str, 0700)
+	}
 	if err != nil {
 		return
 	}
+
+	s.mail = str
 
 	str, _ = s.l.GetConfigOpt("inbound_maildir")
 	if len(str) == 0 {
@@ -477,8 +501,7 @@ func (s *Server) ReloadConfig() (err error) {
 		return
 	}
 	// set pop3 server maildir getter
-	// TODO: implement per user maildirs
-	s.pop.GetMailDir = pop3.NewMailDirGetter(str)
+	s.pop.GetMailDir = s.dao
 
 	str, _ = s.l.GetConfigOpt("outbound_maildir")
 	if len(str) == 0 {
@@ -513,16 +536,56 @@ func (s *Server) ReloadConfig() (err error) {
 		var dao db.DB
 		dao, err = db.NewDB(str)
 		if err == nil {
+			// run database mainloop
+			go dao.Run()
 			err = dao.Ensure()
 			if err == nil {
-				log.Info("Database ready")
-				s.dao = dao
+				// ensure regular utility users
+				for _, name := range []string{"postmaster", "admin", "abuse"} {
+					err = dao.EnsureUser(name, func(u *model.User) error {
+						u.MailDirPath = filepath.Join(s.mail, name)
+						return nil
+					})
+					if err != nil {
+						// failed to ensure this user
+						log.Errorf("failed to ensure standard user %s: %s", name, err.Error())
+						return
+					}
+				}
+
+				// ensure all users' resources are there
+				err = dao.VisitAllUsers(func(u *model.User) error {
+					return u.Ensure()
+				})
+				if err == nil {
+					// set admin password if not set
+					dao.VisitUser("admin", func(admin *model.User) error {
+						if admin.Login == "" {
+							return dao.UpdateUser("admin", func(u *model.User) *model.User {
+								// set default login credential
+								u.Login = string(model.NewLoginCred(DEFAULT_ADMIN_LOGIN))
+								return u
+							})
+						}
+						return nil
+					})
+				}
+
+				if err == nil {
+					log.Info("Database ready")
+					s.dao = dao
+				} else {
+					log.Errorf("failed to ensure users: %s", err.Error())
+				}
+			} else {
+				log.Error("database ensure failed: %s", err.Error())
 			}
 		}
 	}
 	return
 }
 
+// create new server with defaults
 func New() (s *Server) {
 	Appname := fmt.Sprintf("BDSMail-%s", Version())
 	s = &Server{

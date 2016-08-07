@@ -4,14 +4,14 @@ import (
 	"bds/lib/maildir"
 )
 
-// user credential
+// mail user info
 type User struct {
-	// email address of user
-	Email string `xorm:"pk"`
+	// name of this user, aka the name part of name@ourb32address.b32.i2p
+	Name string `xorm:"pk"`
 	// login credential, if empty string login is not allowed
-	Login string
+	Login string `xorm:"login"`
 	// path to maildir
-	MailDirPath string
+	MailDirPath string `xorm:"maildir"`
 }
 
 // check if user's login is correct given password
@@ -25,4 +25,11 @@ func (u *User) CheckLogin(passwd string) (ok bool) {
 // get user's maildir
 func (u *User) MailDir() maildir.MailDir {
 	return maildir.MailDir(u.MailDirPath)
+}
+
+// ensure all resources for this user exist
+// returns an error if one occurs while setting up any resources
+func (u *User) Ensure() (err error) {
+	err = u.MailDir().Ensure()
+	return
 }

@@ -5,7 +5,7 @@ import (
 )
 
 func TestLoginCredHash(t *testing.T) {
-	secret := "password"
+	secret := "admin"
 	cred := NewLoginCred(secret)
 	t.Log(cred)
 	t.Log(cred.hash())
