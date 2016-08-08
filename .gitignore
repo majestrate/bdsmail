@@ -11,8 +11,6 @@ inbound/
 outbound/
 mail/
 
-# config files
-*.lua
 
 # sqlite databases
 *.sqlite
