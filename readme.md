@@ -37,14 +37,14 @@ To generate an initial configuration file run the following:
 ### Current ###
 
 * brain dead simple self hosted i2p mail
+* brain dead simple database backend (sqlite3)
+* brain dead simple smtp access
 * brain dead simple license (MIT)
 
 ### Near Future ###
 
-* brain dead simple database backend (sqlite3)
-* brain dead simple tls enabled by default
-* brain dead simple smtp access
 * brain dead simple pop3 access
+* brain dead simple tls enabled by default
 
 ### Future (Eventually) ###
 
