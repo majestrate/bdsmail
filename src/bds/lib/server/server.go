@@ -170,6 +170,7 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 		// no user use the postmaster maildir instead
 		md, _ = s.dao.GetMailDir("postmaster")
 	}
+	log.Infof("delivering to maildir %s", md)
 	// deliver to the user's maildir if they have one
 	var f io.ReadCloser
 	f, err = os.Open(ev.File)
@@ -181,6 +182,7 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 		os.Remove(ev.File)
 		// rewrite filepath for handler call
 		ev.File = m.Filepath()
+		log.Infof("delivered as %s", ev.File)
 	}
 	if s.Handler != nil {
 		s.Handler.GotMail(ev)
@@ -203,7 +205,7 @@ func (s *Server) runFilter(filtername string, ev *MailEvent) int {
 // check that a remote address is valid for the recipiant
 // this can block for a bit
 func (s *Server) i2pSenderIsValid(addr net.Addr, from string) (valid bool) {
-	fromAddr := parseFromI2PAddr(from)
+	fromAddr := parseFromI2PAddr(normalizeEmail(from))
 	if len(fromAddr) > 0 {
 		tries := 16
 		for tries > 0 {
@@ -229,6 +231,7 @@ func (s *Server) filterMail(ev *MailEvent) (err error) {
 	// check invalid address for i2p
 	if !s.i2pSenderIsValid(ev.Addr, ev.Sender) {
 		// bad address
+		log.Warnf("bad i2p address from %s", ev.Sender)
 		return
 	}
 
@@ -386,7 +389,8 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 
 	// deliver to all
 	for _, recip := range to {
-		if !strings.HasSuffix(recip, ".i2p") {
+		recip = normalizeEmail(recip)
+		if ! strings.HasSuffix(recip, ".i2p") {
 			log.Warnf("Not delivering %s as it's not inside i2p", recip)
 			continue
 		}

@@ -17,3 +17,12 @@ func parseFromI2PAddr(email string) (name string) {
 	name = strings.Trim(name, ",= \t\r\n\f\b")
 	return
 }
+
+func normalizeEmail(email string) (e string) {
+	idx := strings.Index(email, " <")
+	if idx > 0 {
+		e = email[idx+2:]
+	}
+	e = strings.Trim(e, ">")
+	return
+}
