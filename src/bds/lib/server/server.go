@@ -402,6 +402,8 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 			if <-j.Result {
 				// successful delivery
 				log.Infof("mail to %s successfully delivered", recip)
+				// remove file
+				os.Remove(fpath)
 			}
 			chnl <- j.Result
 		}(d)
@@ -413,8 +415,6 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 		close(c)
 		l--
 	}
-	// remove file
-	os.Remove(fpath)
 }
 
 // handle mail for sending from inet to i2p

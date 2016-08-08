@@ -20,8 +20,7 @@ func (ev *userGetEvent) Error() error {
 func (ev *userGetEvent) Query() {
 	var has bool
 	u := new(model.User)
-	u.Name = ev.name
-	has, ev.err = ev.X.engine.Get(u)
+	has, ev.err = ev.X.engine.Id(ev.name).Get(u)
 	if has {
 		ev.u = u
 	}
