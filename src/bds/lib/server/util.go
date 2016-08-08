@@ -19,7 +19,7 @@ func parseFromI2PAddr(email string) (name string) {
 	return
 }
 
-var re_email = regexp.MustCompile(`<([a-zA-Z0-9]*@[a-zA-z0-9]*\.i2p)>`)
+var re_email = regexp.MustCompile(`<?([a-zA-Z0-9]*@[a-zA-z0-9]*\.i2p)>?`)
 
 
 func normalizeEmail(email string) (e string) {
