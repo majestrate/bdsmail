@@ -166,7 +166,7 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 	// get user maildir
 	var md maildir.MailDir
 	md, err = s.dao.GetMailDir(ev.Recip)
-	if err != nil {
+	if md == "" || err != nil {
 		// no user use the postmaster maildir instead
 		md, _ = s.dao.GetMailDir("postmaster")
 	}
