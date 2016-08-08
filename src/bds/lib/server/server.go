@@ -414,7 +414,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	var recips []string
 	for _, r := range to {
 		r = normalizeEmail(r)
-		if strings.HasSuffix(r, ".i2p") {
+		if len(r) > 0 {
 			recips = append(recips, r)
 		}
 	}
