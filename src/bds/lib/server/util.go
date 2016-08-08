@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -18,11 +19,10 @@ func parseFromI2PAddr(email string) (name string) {
 	return
 }
 
+var re_email = regexp.MustCompile(`<([a-zA-Z0-9]*@[a-zA-z0-9]\.i2p)>`)
+
+
 func normalizeEmail(email string) (e string) {
-	idx := strings.Index(email, " <")
-	if idx > 0 {
-		e = email[idx+2:]
-	}
-	e = strings.Trim(e, ">")
+	e = re_email.FindString(email)
 	return
 }

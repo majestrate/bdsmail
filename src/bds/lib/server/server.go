@@ -411,13 +411,22 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	// channel to connect channels to close
 	chnl := make(chan chan bool)
 
-	// deliver to all
-	for _, recip := range to {
-		recip = normalizeEmail(recip)
-		if !strings.HasSuffix(recip, ".i2p") {
-			log.Warnf("Not delivering %s as it's not inside i2p", recip)
-			continue
+	var recips []string
+	for _, r := range to {
+		r = normalizeEmail(r)
+		if strings.HasSuffix(r, ".i2p") {
+			recips = append(recips, r)
 		}
+	}
+
+	if len(recips) == 0 {
+		log.Warnf("%s not deliverable, no valid recipiants", fpath)
+		os.Remove(fpath)
+		return
+	}
+	
+	// deliver to all
+	for _, recip := range recips {
 		// fire off delivery job
 		d := s.mailer.Deliver(recip, from, fpath)
 		jobs = append(jobs, d)
