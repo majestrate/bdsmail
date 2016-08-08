@@ -19,3 +19,8 @@ pkg/
 # private keys
 *.dat
 
+# lua build files
+*.s
+*.o
+*.a
+*.so

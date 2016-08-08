@@ -1,6 +1,7 @@
 package lua
 
-// #cgo pkg-config: luajit
+// #cgo CFLAGS: -I ${SRCDIR}/lua/src
+// #cgo LDFLAGS: ${SRCDIR}/lua/src/libluajit.a -lm -ldl
 // #include <luajit.h>
 // #include <lualib.h>
 // #include <lauxlib.h>
