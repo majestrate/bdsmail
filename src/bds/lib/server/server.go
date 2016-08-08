@@ -9,6 +9,7 @@ import (
 	"bds/lib/pop3"
 	"bds/lib/sendmail"
 	"bds/lib/smtp"
+	"bds/lib/web"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -80,8 +81,19 @@ func (s *Server) Bind() (err error) {
 	s.luamtx.Lock()
 	defer s.luamtx.Unlock()
 
+	// bind web ui
+	addr, ok := s.l.GetConfigOpt("bindweb")
+	if !ok {
+		addr = "127.0.0.1:8080"
+	}
+	log.Infof("binding web ui to %s", addr)
+	s.weblistener, err = net.Listen("tcp", addr)
+	if err != nil {
+		return
+	}
+
 	// bind pop3 server
-	addr, ok := s.l.GetConfigOpt("bindpop3")
+	addr, ok = s.l.GetConfigOpt("bindpop3")
 	if !ok {
 		addr = "127.0.0.1:1110"
 	}
@@ -276,6 +288,18 @@ func (s *Server) Run() {
 		}
 	}()
 
+	// run web ui
+	go func() {
+		if s.webHandler == nil {
+			s.webHandler = http.HandlerFunc(http.NotFound)
+		}
+		log.Info("Serving Web ui")
+		err := http.Serve(s.weblistener, s.webHandler)
+		if err != nil {
+			log.Fatal("web ui died ", err)
+		}
+	}()
+
 	// run send mail acceptor
 	go func() {
 		log.Info("Server Outbound SMTP Server on ", s.smtplistener.Addr())
@@ -390,7 +414,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	// deliver to all
 	for _, recip := range to {
 		recip = normalizeEmail(recip)
-		if ! strings.HasSuffix(recip, ".i2p") {
+		if !strings.HasSuffix(recip, ".i2p") {
 			log.Warnf("Not delivering %s as it's not inside i2p", recip)
 			continue
 		}
@@ -585,6 +609,10 @@ func (s *Server) ReloadConfig() (err error) {
 				log.Error("database ensure failed: %s", err.Error())
 			}
 		}
+	}
+	assetsdir, ok := s.l.GetConfigOpt("assets")
+	if ok && s.dao != nil {
+		s.webHandler = web.NewMiddleware(assetsdir, s.dao)
 	}
 	return
 }

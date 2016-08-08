@@ -1,7 +1,7 @@
 package admin
 
 import (
-	"github.com/majestrate/bdsmail/lib/db"
+	"bds/lib/db"
 	"net/http"
 )
 

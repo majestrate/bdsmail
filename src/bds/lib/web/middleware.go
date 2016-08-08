@@ -1,21 +1,20 @@
 package web
 
 import (
-	"github.com/gorilla/mux"
-	"github.com/majestrate/bdsmail/lib/db"
-	"github.com/majestrate/bdsmail/lib/web/admin"
-	"github.com/majestrate/bdsmail/lib/web/webmail"
+	"bds/lib/db"
+	"bds/lib/web/admin"
+	"bds/lib/web/webmail"
 	"net/http"
 )
 
 // create middleware for web ui
 func NewMiddleware(assetsdir string, dao db.DB) http.Handler {
-	r := mux.NewRouter()
+	r := newRouter()
 	// admin actions
 	r.Handle("/admin", admin.New(dao))
 	// mail actions
 	r.Handle("/mail", webmail.New(dao))
 	// file server
-	r.Handle("/", http.FileServer(http.Dir(assetsdir)))
+	r.HandleDefault(http.FileServer(http.Dir(assetsdir)))
 	return r
 }
