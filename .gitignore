@@ -6,6 +6,11 @@
 bin/bdsconfig
 bin/maild
 
+# mail directories
+inbound/
+outbound/
+mail/
+
 # config files
 *.lua
 

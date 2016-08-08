@@ -9,8 +9,8 @@ Brain Dead Simple Mail Server
 
 Dependancies:
 
-* luajit
-* go 1.6 with c compiler
+* gcc 4.8 or higher
+* go 1.6 
 * git
 * make
 * i2p with SAM enabled
