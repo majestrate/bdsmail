@@ -415,6 +415,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	for _, r := range to {
 		log.Info(r)
 		r = normalizeEmail(r)
+		log.Info(r)
 		if len(r) > 0 {
 			recips = append(recips, r)
 		}
