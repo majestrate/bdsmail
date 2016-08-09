@@ -5,6 +5,7 @@
 # binary files
 bin/bdsconfig
 bin/maild
+bin/newmail
 
 # mail directories
 inbound/

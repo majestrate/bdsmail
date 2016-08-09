@@ -10,6 +10,7 @@ $(LUA_LIB):
 
 build: $(LUA_LIB)
 	go install -v bds/cmd/maild
+	go install -v bds/cmd/newmail
 	go install -v bds/cmd/bdsconfig
 
 clean:
