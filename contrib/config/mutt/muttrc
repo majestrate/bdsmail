@@ -13,3 +13,6 @@ set use_from=yes
 
 # set from address
 set from=admin@putyourb32addresshere.b32.i2p
+
+# set mailbox for admin, replace "/path/to/bdsmail/" with path to bdsmail repo
+mailboxes /path/to/bdsmail/mail/admin

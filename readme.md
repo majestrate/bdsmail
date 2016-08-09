@@ -32,6 +32,10 @@ To generate an initial configuration file run the following:
 
     $ ./bin/maild config.lua
 
+### Email setup ###
+
+See the example config for mutt [here](contrib/config/mutt/muttrc)
+
 ## Features ##
 
 ### Current ###
