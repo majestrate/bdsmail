@@ -13,6 +13,15 @@ type LocalDeliverJob struct {
 	fpath string
 }
 
+// new local delivery job
+func NewLocalDelivery(md maildir.MailDir, fpath string) DeliverJob {
+	return &LocalDeliverJob{
+		mailDir: md,
+		result: make(chan bool),
+		fpath: fpath,
+	}
+}
+
 // local delivery is not cancelable
 // TODO: make this configurable
 func (l *LocalDeliverJob) Cancel() {

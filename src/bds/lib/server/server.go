@@ -191,8 +191,13 @@ func (s *Server) GetMailDir(email string) (md maildir.MailDir, err error) {
 func (s *Server) gotMail(ev *MailEvent) (err error) {
 	log.Info("we got mail for ", ev.Recip, " from ", ev.Sender)
 
-	// deliver
-	j := s.mailer.Deliver(ev.Recip, ev.Sender, ev.File)
+	var md maildir.MailDir
+	md, err = s.GetMailDir(ev.Recip)
+	if md == "" {
+		md, _  = s.dao.GetMailDir("postmaster")
+	}
+	// deliver locally
+	j := sendmail.NewLocalDelivery(md, ev.File)
 	go j.Run()
 	ok := j.Wait()
 	if ok && s.Handler != nil {
