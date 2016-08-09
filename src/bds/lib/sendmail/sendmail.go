@@ -2,6 +2,7 @@ package sendmail
 
 import (
 	log "github.com/Sirupsen/logrus"
+	"bds/lib/maildir"
 	"net"
 	"net/smtp"
 	"sync"
@@ -31,6 +32,8 @@ func (c *connection) Quit() {
 
 // mail delivery
 type Mailer struct {
+	// get maildir for local user
+	LocalMailDir maildir.Getter
 	// a dial function to obtain outbound smtp client
 	Dial Dialer
 	// number of times to try to deliver mail
@@ -146,7 +149,7 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 
 // try delivering mail
 // returns a DeliveryJob that can be cancelled
-func (s *Mailer) Deliver(recip, from, fpath string) (d *DeliverJob) {
+func (s *Mailer) Deliver(recip, from, fpath string) (d DeliverJob) {
 	log.Infof("Delivering  mail to %s from %s", recip, from)
 	dialer := s.Dial
 	if dialer == nil {
@@ -180,31 +183,46 @@ func (s *Mailer) Deliver(recip, from, fpath string) (d *DeliverJob) {
 			}
 			return
 		}
+	} 
+	var md maildir.MailDir
+	if s.LocalMailDir != nil {
+		var err error
+		md, err = s.LocalMailDir.GetMailDir(recip)
+		if err != nil {
+			log.Errorf("error durring delivery: %s", err.Error())
+			return
+		}
 	}
 
-	d = &DeliverJob{
-		unlimited: s.Retries == 0,
-		cancel:    false,
-		retries:   s.Retries,
-		visit: func(f func(*smtp.Client) error) error {
-			r_addr := extractAddr(recip)
-			a, err := resolver(r_addr)
-			if err == nil {
-				err = s.visitConn(a.Network(), r_addr, extractAddr(from), dialer, f)
-			} else {
-				log.Warnf("failed to resolve %s: %s", r_addr, err.Error())
-			}
-			return err
-		},
-		bounce:    bounce,
-		recip:     recip,
-		from:      from,
-		fpath:     fpath,
-		Result:    make(chan bool),
-		delivered: s.Success,
+	if md == "" {
+		d = &RemoteDeliverJob{
+			unlimited: s.Retries == 0,
+			cancel:    false,
+			retries:   s.Retries,
+			visit: func(f func(*smtp.Client) error) error {
+				r_addr := extractAddr(recip)
+				a, err := resolver(r_addr)
+				if err == nil {
+					err = s.visitConn(a.Network(), r_addr, extractAddr(from), dialer, f)
+				} else {
+					log.Warnf("failed to resolve %s: %s", r_addr, err.Error())
+				}
+				return err
+			},
+			bounce:    bounce,
+			recip:     recip,
+			from:      from,
+			fpath:     fpath,
+			result:    make(chan bool),
+			delivered: s.Success,
+		}
+	} else {
+		d = &LocalDeliverJob{
+			mailDir: md,
+			result: make(chan bool),
+			fpath: fpath,
+		}
 	}
-	// run delivery in background
-	go d.run()
 	return
 }
 

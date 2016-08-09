@@ -13,7 +13,6 @@ import (
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
-	"io"
 	"net"
 	"net/http"
 	"net/textproto"
@@ -137,6 +136,7 @@ func (s *Server) Bind() (err error) {
 			s.mailer.Resolve = func(addr string) (net.Addr, error) {
 				return session.LookupI2P(addr)
 			}
+			s.mailer.LocalMailDir = s
 		} else {
 			// close session we got an error setting up local smtp listener
 			session.Close()
@@ -171,34 +171,34 @@ func (s *Server) queueMail(addr net.Addr, from string, to []string, fpath string
 	}
 }
 
+// get a local maildir or empty string if it's not local to us
+func (s *Server) GetMailDir(email string) (md maildir.MailDir, err error) {
+	email = normalizeEmail(email)
+	if strings.Count(email, "@") == 1 {
+		parts := strings.Split(email, "@")
+		if len(parts) == 2 {
+			addr := parts[1]
+			user := parts[0]
+			if addr == s.session.B32() && s.dao != nil {
+				md, err = s.dao.GetMailDir(user)
+			}
+		}
+	}
+	return
+}
+
 // we got mail that was not dropped by the filters
 func (s *Server) gotMail(ev *MailEvent) (err error) {
 	log.Info("we got mail for ", ev.Recip, " from ", ev.Sender)
 
-	// get user maildir
-	var md maildir.MailDir
-	md, err = s.dao.GetMailDir(ev.Recip)
-	if md == "" || err != nil {
-		// no user use the postmaster maildir instead
-		md, _ = s.dao.GetMailDir("postmaster")
-	}
-	log.Infof("delivering to maildir %s", md)
-	// deliver to the user's maildir if they have one
-	var f io.ReadCloser
-	f, err = os.Open(ev.File)
-	if err == nil {
-		var m maildir.Message
-		m, err = md.Deliver(f)
-		f.Close()
-		// delete old file
-		os.Remove(ev.File)
-		// rewrite filepath for handler call
-		ev.File = m.Filepath()
-		log.Infof("delivered as %s", ev.File)
-	}
-	if s.Handler != nil {
+	// deliver
+	j := s.mailer.Deliver(ev.Recip, ev.Sender, ev.File)
+	go j.Run()
+	ok := j.Wait()
+	if ok && s.Handler != nil {
 		s.Handler.GotMail(ev)
 	}
+	os.Remove(ev.File)
 	return
 }
 
@@ -407,9 +407,7 @@ func (s *Server) flushOutboundMailQueue() {
 // send 1 outbound message
 func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	log.Infof("Sending outbound mail %s", fpath)
-	var jobs []*sendmail.DeliverJob
-	// channel to connect channels to close
-	chnl := make(chan chan bool)
+	var jobs []sendmail.DeliverJob
 
 	var recips []string
 	for _, r := range to {
@@ -430,24 +428,17 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 		// fire off delivery job
 		d := s.mailer.Deliver(recip, from, fpath)
 		jobs = append(jobs, d)
-		// collect job
-		go func(j *sendmail.DeliverJob) {
-			if <-j.Result {
-				// successful delivery
-				log.Infof("mail to %s successfully delivered", recip)
-				// remove file
-				os.Remove(fpath)
-			}
-			chnl <- j.Result
-		}(d)
+		go d.Run()
 	}
-	// collect delivery jobs
-	l := len(jobs)
-	for l > 0 {
-		c := <-chnl
-		close(c)
-		l--
+
+	// collect all
+	for _, j := range jobs {
+		j.Wait()
 	}
+
+	// TODO: retry delivery ?
+	os.Remove(fpath)
+	
 }
 
 // handle mail for sending from inet to i2p
