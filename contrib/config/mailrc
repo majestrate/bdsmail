@@ -1,7 +1,7 @@
 #
 # cp /path/to/this/file ~/.mailrc
 #
-# echo "testing sendmail" | sendmail -A i2p jeff@ivpxmoh2qzcmxbij3sxfnlsua6panhxke2b3bbhn4xxw7oacujdq.b32.i2p
+# echo "testing sendmail" | mailx -A i2p jeff@ivpxmoh2qzcmxbij3sxfnlsua6panhxke2b3bbhn4xxw7oacujdq.b32.i2p
 #
 
 account i2p {
