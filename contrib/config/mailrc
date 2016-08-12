@@ -1,0 +1,10 @@
+#
+# cp /path/to/this/file ~/.mailrc
+#
+# echo "testing sendmail" | sendmail -A i2p jeff@ivpxmoh2qzcmxbij3sxfnlsua6panhxke2b3bbhn4xxw7oacujdq.b32.i2p
+#
+
+account i2p {
+set from="name <admin@insertyourb32addresshere.b32.i2p>"
+set smtp=smtp://127.0.0.1:2525
+}
