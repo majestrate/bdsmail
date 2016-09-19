@@ -62,7 +62,10 @@ func (d *RemoteDeliverJob) Run() {
 	tries := 0
 	sec := time.Duration(1)
 	var err error
-	for (d.unlimited || tries < d.retries) && !d.cancel {
+	for d.unlimited || tries < d.retries {
+		if d.cancel {
+			break
+		}
 		// try visiting connection with tryDeliver method
 		err = d.visit(d.tryDeliver)
 		if err == nil {
