@@ -10,6 +10,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -168,6 +169,8 @@ type samSession struct {
 	k *samKeys
 	// control connection
 	c net.Conn
+	// access mutex for control conntection
+	cm sync.RWMutex
 	// packet connection
 	p net.PacketConn
 	// minimum version
@@ -488,8 +491,9 @@ func (s *samSession) Lookup(name string) (a net.Addr, err error) {
 }
 
 func (s *samSession) LookupI2P(name string) (a I2PAddr, err error) {
-	var c net.Conn
-	c, err = s.connect("")
+	s.cm.Lock()
+	defer s.cm.Unlock()
+	c := s.c
 	if err == nil {
 		_, err = fmt.Fprintf(c, "NAMING LOOKUP NAME=%s\n", name)
 		if err == nil {
@@ -514,7 +518,6 @@ func (s *samSession) LookupI2P(name string) (a I2PAddr, err error) {
 				}
 			}
 		}
-		c.Close()
 	}
 	return
 }

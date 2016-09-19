@@ -14,6 +14,9 @@ build: $(LUA_LIB)
 	go install -v bds/cmd/bdsconfig
 
 clean:
-	make -C $(LUA_SRC) clean
+	$(MAKE) -C $(LUA_SRC) clean
 	go clean -v
 	rm -rf pkg
+
+test:
+	go test bds/lib/...

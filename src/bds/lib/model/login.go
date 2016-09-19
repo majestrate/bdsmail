@@ -2,9 +2,9 @@ package model
 
 import (
 	"bds/lib/base91"
-	"bds/lib/cryptonight"
 	"bytes"
 	"crypto/rand"
+	"crypto/sha256"
 	"io"
 	"strings"
 )
@@ -13,6 +13,9 @@ import (
 type LoginCred string
 
 const login_cred_delim = " "
+
+// how many iterations of sha256 to use
+const num_sha_digest_iteration = 1024 * 1024 
 
 // generate a new login cred, generates random salt and stores as hashed
 func NewLoginCred(secret string) LoginCred {
@@ -26,11 +29,18 @@ func NewLoginCred(secret string) LoginCred {
 
 // hash login credential with a salt
 func credHash(data, salt []byte) (h []byte) {
-	d := make([]byte, len(data)+len(salt))
+	l := len(data) + len(salt)
+	d := make([]byte, l + sha256.Size)
 	copy(d, data)
 	copy(d[:len(data)], salt)
-	r := cryptonight.HashBytes(d)
-	h = r[:]
+	i := num_sha_digest_iteration
+	for i > 0 {
+		_h := sha256.Sum256(d)
+		copy(d[l:], _h[:])
+		i--
+	}
+	h = make([]byte, sha256.Size)
+	copy(h, d[l:])
 	return
 }
 
