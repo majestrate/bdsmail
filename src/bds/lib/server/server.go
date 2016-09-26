@@ -378,9 +378,16 @@ func (s *Server) flushOutboundMailQueue() {
 	log.Debug("flush outbound messages")
 	msgs, err := s.outserv.MailDir.ListNew()
 	if err == nil {
-		var jobs []sendmail.DeliverJob
 		var files []string
 		log.Debugf("%d messages to send in", len(msgs), s.inserv.MailDir)
+		for _, msg := range msgs {
+			s.outserv.MailDir.ProcessNew(msg)
+		}
+		msgs, err = s.outserv.MailDir.ListCur()
+		if err != nil {
+			log.Errorf("failed to process maildir: %s", err.Error())
+			return
+		}
 		for _, msg := range msgs {
 			f, err := os.Open(msg.Filepath())
 			if err == nil {
@@ -398,8 +405,7 @@ func (s *Server) flushOutboundMailQueue() {
 						}
 					}
 					c.Close()
-					j := s.prepareOutboundMessage(from, to, msg.Filepath())
-					jobs = append(jobs, j...)
+					go s.sendOutboundMessage(from, to, msg.Filepath())
 				} else {
 					log.Errorf("bad outboud message %s: %s", msg.Filepath(), err.Error())
 					c.Close()
@@ -408,25 +414,13 @@ func (s *Server) flushOutboundMailQueue() {
 				log.Errorf("no such outbound message %s: %s", msg.Filepath(), err.Error())
 			}
 		}
-		// fire all
-		for _, d := range jobs {
-			go d.Run()
-		}
-		// collect all
-		for _, j := range jobs {
-			j.Wait()
-		}
-		// clean
-		for _, f := range files {
-			os.Remove(f)
-		}
 	} else {
 		log.Errorf("failed to find new messages in %s: %s", s.inserv.MailDir, err.Error())
 	}
 }
 
-// make deliver job for 1 outbound messages 
-func (s *Server) prepareOutboundMessage(from string, to []string, fpath string) (jobs []sendmail.DeliverJob) {
+// send 1 outbound messages 
+func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	log.Infof("Sending outbound mail %s", fpath)
 	var recips []string
 	for _, r := range to {
@@ -441,12 +435,23 @@ func (s *Server) prepareOutboundMessage(from string, to []string, fpath string) 
 		os.Remove(fpath)
 		return
 	}
+
+	var jobs []sendmail.DeliverJob
+	
 	// deliver to all
 	for _, recip := range recips {
 		// fire off delivery job
 		d := s.mailer.Deliver(recip, from, fpath)
 		jobs = append(jobs, d)
+		go d.Run()
 	}
+
+	for _, j := range jobs {
+		j.Wait()
+	}
+
+	os.Remove(fpath)
+	
 	return
 }
 
