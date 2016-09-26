@@ -214,7 +214,7 @@ func (p *pop3Session) handleTransactionLine(line string) (err error) {
 			p.OK("")
 			dw := p.c.DotWriter()
 			for idx, msg := range p.msgs {
-				fmt.Fprintf(dw, "%d %s\r\n", idx, msg.Filename())
+				fmt.Fprintf(dw, "%d %s\r\n", 1+idx, msg.Filename())
 			}
 			// FLUSH :D
 			err = dw.Close()
