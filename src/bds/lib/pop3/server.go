@@ -51,7 +51,7 @@ func (s *Server) getMessages(user string) (msgs []maildir.Message, err error) {
 	ms, err = md.ListNew()
 	if err == nil {
 		for _, m := range ms {
-			err = md.ProcessNew(m)
+			_, err = md.ProcessNew(m)
 			if err != nil {
 				log.Errorf("error processing maildir: %s", err.Error())
 			}

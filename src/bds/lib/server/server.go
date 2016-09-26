@@ -380,15 +380,14 @@ func (s *Server) flushOutboundMailQueue() {
 	if err == nil {
 		var files []string
 		log.Debugf("%d messages to send in", len(msgs), s.inserv.MailDir)
+		var outmsg []maildir.Message
 		for _, msg := range msgs {
-			s.outserv.MailDir.ProcessNew(msg)
+			m, err := s.outserv.MailDir.ProcessNew(msg)
+			if err == nil {
+				outmsg = append(outmsg, m)
+			}
 		}
-		msgs, err = s.outserv.MailDir.ListCur()
-		if err != nil {
-			log.Errorf("failed to process maildir: %s", err.Error())
-			return
-		}
-		for _, msg := range msgs {
+		for _, msg := range outmsg {
 			f, err := os.Open(msg.Filepath())
 			if err == nil {
 				files = append(files, msg.Filepath())
