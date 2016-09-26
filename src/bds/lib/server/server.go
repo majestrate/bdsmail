@@ -378,10 +378,13 @@ func (s *Server) flushOutboundMailQueue() {
 	log.Debug("flush outbound messages")
 	msgs, err := s.outserv.MailDir.ListNew()
 	if err == nil {
+		var jobs []sendmail.DeliverJob
+		var files []string
 		log.Debugf("%d messages to send in", len(msgs), s.inserv.MailDir)
 		for _, msg := range msgs {
 			f, err := os.Open(msg.Filepath())
 			if err == nil {
+				files = append(files, msg.Filepath())
 				c := textproto.NewConn(f)
 				hdr, err := c.ReadMIMEHeader()
 				if err == nil {
@@ -395,7 +398,8 @@ func (s *Server) flushOutboundMailQueue() {
 						}
 					}
 					c.Close()
-					s.sendOutboundMessage(from, to, msg.Filepath())
+					j := s.prepareOutboundMessage(from, to, msg.Filepath())
+					jobs = append(jobs, j...)
 				} else {
 					log.Errorf("bad outboud message %s: %s", msg.Filepath(), err.Error())
 					c.Close()
@@ -404,13 +408,25 @@ func (s *Server) flushOutboundMailQueue() {
 				log.Errorf("no such outbound message %s: %s", msg.Filepath(), err.Error())
 			}
 		}
+		// fire all
+		for _, d := range jobs {
+			go d.Run()
+		}
+		// collect all
+		for _, j := range jobs {
+			j.Wait()
+		}
+		// clean
+		for _, f := range files {
+			os.Remove(f)
+		}
 	} else {
 		log.Errorf("failed to find new messages in %s: %s", s.inserv.MailDir, err.Error())
 	}
 }
 
-// send 1 outbound message
-func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
+// make deliver job for 1 outbound messages 
+func (s *Server) prepareOutboundMessage(from string, to []string, fpath string) (jobs []sendmail.DeliverJob) {
 	log.Infof("Sending outbound mail %s", fpath)
 	var recips []string
 	for _, r := range to {
@@ -425,26 +441,13 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 		os.Remove(fpath)
 		return
 	}
-
-	// fork off deliver job
-	go func(r []string) {
-		var jobs []sendmail.DeliverJob
-		// deliver to all
-		for _, recip := range r {
-			// fire off delivery job
-			d := s.mailer.Deliver(recip, from, fpath)
-			jobs = append(jobs, d)
-			go d.Run()
-		}
-
-		// collect all
-		for _, j := range jobs {
-			j.Wait()
-		}
-
-		// TODO: retry delivery ?
-		os.Remove(fpath)
-	}(recips)	
+	// deliver to all
+	for _, recip := range recips {
+		// fire off delivery job
+		d := s.mailer.Deliver(recip, from, fpath)
+		jobs = append(jobs, d)
+	}
+	return
 }
 
 // handle mail for sending from inet to i2p
