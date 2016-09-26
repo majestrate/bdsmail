@@ -13,14 +13,18 @@ import (
 
 func main() {
 
-	if len(os.Args) != 4 {
-		log.Errorf("Usage: %s config.lua username maildirpath", os.Args[0])
+	if len(os.Args) < 4 {
+		log.Errorf("Usage: %s config.lua username maildirpath [password]", os.Args[0])
 		return
 	}
 	
 	cfg_fname := os.Args[1]
 	user := os.Args[2]
 	m, _ := filepath.Abs(os.Args[3])
+	passwd := ""
+	if len(os.Args) == 5 {
+		passwd = os.Args[4]
+	}
 	md := maildir.MailDir(m)
 	err := md.Ensure()
 	if err != nil {
@@ -42,6 +46,9 @@ func main() {
 		err = db.EnsureUser(user, func(u *model.User) error {
 			log.Infof("creating user: %s", u.Name)
 			u.MailDirPath = m
+			if len(passwd) > 0 {
+				u.Login = string(model.NewLoginCred(passwd))
+			}
 			return nil
 		})
 		if err != nil {

@@ -223,16 +223,8 @@ func (p *pop3Session) handleTransactionLine(line string) (err error) {
 		break
 	case "STAT":
 		// begin
-		_, err = p.c.W.WriteString("+OK ")
-		if err == nil {
-			// write list
-			for idx, _ := range p.msgs {
-				_, err = fmt.Fprintf(p.c.W, "%d ", 1+idx)
-				if err != nil {
-					break
-				}
-			}
-		}
+		_, err = fmt.Fprintf(p.c.W, "+OK %d %d", len(p.msgs), p.octs)
+		
 		if err == nil {
 			// done writing list
 			err = p.c.PrintfLine("")
