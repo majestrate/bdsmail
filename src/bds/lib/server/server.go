@@ -412,8 +412,6 @@ func (s *Server) flushOutboundMailQueue() {
 // send 1 outbound message
 func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	log.Infof("Sending outbound mail %s", fpath)
-	var jobs []sendmail.DeliverJob
-
 	var recips []string
 	for _, r := range to {
 		r = normalizeEmail(r)
@@ -427,23 +425,26 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 		os.Remove(fpath)
 		return
 	}
-	
-	// deliver to all
-	for _, recip := range recips {
-		// fire off delivery job
-		d := s.mailer.Deliver(recip, from, fpath)
-		jobs = append(jobs, d)
-		go d.Run()
-	}
 
-	// collect all
-	for _, j := range jobs {
-		j.Wait()
-	}
+	// fork off deliver job
+	go func(r []string) {
+		var jobs []sendmail.DeliverJob
+		// deliver to all
+		for _, recip := range r {
+			// fire off delivery job
+			d := s.mailer.Deliver(recip, from, fpath)
+			jobs = append(jobs, d)
+			go d.Run()
+		}
 
-	// TODO: retry delivery ?
-	os.Remove(fpath)
-	
+		// collect all
+		for _, j := range jobs {
+			j.Wait()
+		}
+
+		// TODO: retry delivery ?
+		os.Remove(fpath)
+	}(recips)	
 }
 
 // handle mail for sending from inet to i2p
