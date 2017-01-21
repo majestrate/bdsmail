@@ -1,5 +1,4 @@
-GOPATH=$(PWD)
-LUA_SRC=$(GOPATH)/src/bds/lib/lua/lua/src
+LUA_SRC=$(PWD)/src/bds/lib/lua/lua/src
 LUA_LIB=$(LUA_SRC)/libluajit.a
 
 
@@ -9,9 +8,9 @@ $(LUA_LIB):
 	$(MAKE) -C $(LUA_SRC) $(MOPTS)
 
 build: $(LUA_LIB)
-	go install -v bds/cmd/maild
-	go install -v bds/cmd/newmail
-	go install -v bds/cmd/bdsconfig
+	GOPATH=$(PWD) go install -v bds/cmd/maild
+	GOPATH=$(PWD) go install -v bds/cmd/newmail
+	GOPATH=$(PWD) go install -v bds/cmd/bdsconfig
 
 clean:
 	$(MAKE) -C $(LUA_SRC) clean
