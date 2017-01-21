@@ -36,6 +36,10 @@ To generate an initial configuration file run the following:
 
 See the example config for mutt [here](contrib/config/mutt/muttrc)
 
+### Contact ###
+
+my mail address is `jeff@ivpxmoh2qzcmxbij3sxfnlsua6panhxke2b3bbhn4xxw7oacujdq.b32.i2p` if the server is down ding me on xmpp: `jeff@i2p.rocks`
+
 ## Features ##
 
 ### Current ###
