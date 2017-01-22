@@ -1,6 +1,6 @@
 ![logo](logo.png "logo")
 
-Brain Dead Simple Mail Server ᴮᴱᵀᴬ
+# Brain Dead Simple Mail Server ᴮᴱᵀᴬ #
 
 ### Building From Source ###
 
