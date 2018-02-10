@@ -15,4 +15,4 @@ set use_from=yes
 set from=admin@putyourb32addresshere.b32.i2p
 
 # set mailbox for admin, replace "/path/to/bdsmail/" with path to bdsmail repo
-set poolfile=/path/to/bdsmail/mail/admin
+set spoolfile=/path/to/bdsmail/mail/admin

@@ -15,7 +15,7 @@ func (c *Config) Load(fname string) (err error) {
 	var conf *parser.Configuration
 	conf, err = parser.Read(fname)
 	if err == nil {
-		s, _ := conf.Section("")
+		s, _ := conf.Section("maild")
 		if s != nil {
 			c.opts = s.Options()
 		}

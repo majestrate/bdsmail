@@ -23,7 +23,7 @@ func main() {
 	if len(os.Args) > 2 {
 		maildir = os.Args[2]
 	}
-
+	fmt.Println("[maild]")
 	fmt.Printf(`i2paddr = %s`, i2paddr)
 	fmt.Printf("\n")
 	fmt.Printf(`i2pkeyfile = %s`, keyfile)
