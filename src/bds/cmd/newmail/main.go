@@ -1,15 +1,14 @@
 package main
 
 import (
-	log "github.com/Sirupsen/logrus"
+	"bds/lib/config"
 	"bds/lib/db"
-	"bds/lib/lua"
 	"bds/lib/maildir"
 	"bds/lib/model"
+	log "github.com/Sirupsen/logrus"
 	"os"
 	"path/filepath"
 )
-
 
 func main() {
 
@@ -17,7 +16,7 @@ func main() {
 		log.Errorf("Usage: %s config.lua username maildirpath [password]", os.Args[0])
 		return
 	}
-	
+
 	cfg_fname := os.Args[1]
 	user := os.Args[2]
 	m, _ := filepath.Abs(os.Args[3])
@@ -31,11 +30,10 @@ func main() {
 		log.Errorf("failed to create maildir: %s", err.Error())
 		return
 	}
-	l := lua.New()
-	l.JIT()
-	l.LoadFile(cfg_fname)
-	
-	s, ok := l.GetConfigOpt("database")
+	conf := new(config.Config)
+	conf.Load(cfg_fname)
+
+	s, ok := conf.Get("database")
 	if ok {
 		db, err := db.NewDB(s)
 		if err != nil {
@@ -56,5 +54,4 @@ func main() {
 		}
 		db.Close()
 	}
-	l.Close()
 }

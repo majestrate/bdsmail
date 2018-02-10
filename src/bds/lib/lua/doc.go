@@ -1,4 +1,0 @@
-//
-// lua interpreter
-//
-package lua

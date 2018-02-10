@@ -1,9 +1,9 @@
 package server
 
 import (
+	"bds/lib/config"
 	"bds/lib/db"
 	"bds/lib/i2p"
-	"bds/lib/lua"
 	"bds/lib/maildir"
 	"bds/lib/model"
 	"bds/lib/pop3"
@@ -41,7 +41,7 @@ type Server struct {
 	// unexported fields
 
 	// lua interpreter core
-	l *lua.Lua
+	conf config.Config
 
 	inserv  *smtp.Server
 	outserv *smtp.Server
@@ -76,12 +76,8 @@ type Server struct {
 
 // bind network services
 func (s *Server) Bind() (err error) {
-	// we touch the lua config so lock
-	s.luamtx.Lock()
-	defer s.luamtx.Unlock()
-
 	// bind web ui
-	addr, ok := s.l.GetConfigOpt("bindweb")
+	addr, ok := s.conf.Get("bindweb")
 	if !ok {
 		addr = "127.0.0.1:8080"
 	}
@@ -92,7 +88,7 @@ func (s *Server) Bind() (err error) {
 	}
 
 	// bind pop3 server
-	addr, ok = s.l.GetConfigOpt("bindpop3")
+	addr, ok = s.conf.Get("bindpop3")
 	if !ok {
 		addr = "127.0.0.1:1110"
 	}
@@ -103,12 +99,12 @@ func (s *Server) Bind() (err error) {
 	}
 
 	// keyfile for i2p destination
-	keyfile, ok := s.l.GetConfigOpt("i2pkeyfile")
+	keyfile, ok := s.conf.Get("i2pkeyfile")
 	if !ok {
 		keyfile = "bdsmail-privkey.dat"
 	}
 	// address of i2p router
-	i2paddr, ok := s.l.GetConfigOpt("i2paddr")
+	i2paddr, ok := s.conf.Get("i2paddr")
 	if !ok {
 		i2paddr = "127.0.0.1:7656"
 	}
@@ -119,7 +115,7 @@ func (s *Server) Bind() (err error) {
 		// made session
 
 		// get local smtp address
-		addr, ok := s.l.GetConfigOpt("bindmail")
+		addr, ok := s.conf.Get("bindmail")
 		if !ok {
 			addr = "127.0.0.1:2525"
 		}
@@ -194,7 +190,7 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 	var md maildir.MailDir
 	md, err = s.GetMailDir(ev.Recip)
 	if md == "" {
-		md, _  = s.dao.GetMailDir("postmaster")
+		md, _ = s.dao.GetMailDir("postmaster")
 	}
 	// deliver locally
 	j := sendmail.NewLocalDelivery(md, ev.File)
@@ -210,13 +206,7 @@ func (s *Server) gotMail(ev *MailEvent) (err error) {
 // run a lua filter given a mail event
 // return the code returned by the lua function
 func (s *Server) runFilter(filtername string, ev *MailEvent) int {
-	// acquire lua lock
-	s.luamtx.Lock()
-	defer s.luamtx.Unlock()
-	log.Debug(`running filter "` + filtername + `"...`)
-	ret := s.l.CallMailFilter(filtername, ev.Addr.String(), ev.Recip, ev.Sender, "")
-	log.Debug(`filter "`+filtername+`" returned `, ret)
-	return ret
+	return 0
 }
 
 // check that a remote address is valid for the recipiant
@@ -418,7 +408,7 @@ func (s *Server) flushOutboundMailQueue() {
 	}
 }
 
-// send 1 outbound messages 
+// send 1 outbound messages
 func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	log.Infof("Sending outbound mail %s", fpath)
 	var recips []string
@@ -436,7 +426,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	}
 
 	var jobs []sendmail.DeliverJob
-	
+
 	// deliver to all
 	for _, recip := range recips {
 		// fire off delivery job
@@ -450,7 +440,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	}
 
 	os.Remove(fpath)
-	
+
 	return
 }
 
@@ -471,7 +461,6 @@ func (s *Server) handleInetMail(remote net.Addr, from string, to []string, fpath
 // stop server
 func (s *Server) Stop() {
 	close(s.chnl)
-	s.luamtx.Lock()
 	if s.mailer != nil {
 		s.mailer.Quit()
 		s.mailer = nil
@@ -488,11 +477,6 @@ func (s *Server) Stop() {
 		s.weblistener.Close()
 		s.weblistener = nil
 	}
-	if s.l != nil {
-		s.l.Close()
-		s.l = nil
-	}
-	s.luamtx.Unlock()
 	log.Info("Server Stopped")
 }
 
@@ -506,14 +490,11 @@ func (s *Server) LoadConfig(fname string) (err error) {
 
 // reload server configuration
 func (s *Server) ReloadConfig() (err error) {
-	// acquire lua lock
-	s.luamtx.Lock()
-	defer s.luamtx.Unlock()
-	err = s.l.LoadFile(s.configFname)
+	err = s.conf.Load(s.configFname)
 	if err != nil {
 		return
 	}
-	str, _ := s.l.GetConfigOpt("maildir")
+	str, _ := s.conf.Get("maildir")
 	if len(str) == 0 {
 		str = "mail"
 	}
@@ -530,7 +511,7 @@ func (s *Server) ReloadConfig() (err error) {
 
 	s.mail = str
 
-	str, _ = s.l.GetConfigOpt("inbound_maildir")
+	str, _ = s.conf.Get("inbound_maildir")
 	if len(str) == 0 {
 		str = "inbound"
 	}
@@ -544,7 +525,7 @@ func (s *Server) ReloadConfig() (err error) {
 	// set pop3 server maildir getter
 	s.pop.GetMailDir = s.dao
 
-	str, _ = s.l.GetConfigOpt("outbound_maildir")
+	str, _ = s.conf.Get("outbound_maildir")
 	if len(str) == 0 {
 		str = "outbound"
 	}
@@ -556,7 +537,7 @@ func (s *Server) ReloadConfig() (err error) {
 		return
 	}
 
-	str, _ = s.l.GetConfigOpt("domain")
+	str, _ = s.conf.Get("domain")
 	if len(str) == 0 {
 		if s.session != nil {
 			str = s.session.B32()
@@ -569,7 +550,7 @@ func (s *Server) ReloadConfig() (err error) {
 	s.outserv.Hostname = "bdsmail"
 	// only initialize dao if not initialized
 	if s.dao == nil {
-		str, _ = s.l.GetConfigOpt("database")
+		str, _ = s.conf.Get("database")
 		if len(str) == 0 {
 			str = "mailserver.sqlite"
 		}
@@ -623,7 +604,7 @@ func (s *Server) ReloadConfig() (err error) {
 			}
 		}
 	}
-	assetsdir, ok := s.l.GetConfigOpt("assets")
+	assetsdir, ok := s.conf.Get("assets")
 	if ok && s.dao != nil {
 		s.webHandler = web.NewMiddleware(assetsdir, s.dao)
 	}
@@ -635,7 +616,6 @@ func New() (s *Server) {
 	Appname := fmt.Sprintf("BDSMail-%s", Version())
 	s = &Server{
 		chnl: make(chan *MailEvent, 10),
-		l:    lua.New(),
 		inserv: &smtp.Server{
 			Appname: Appname,
 		},
@@ -643,9 +623,6 @@ func New() (s *Server) {
 			Appname: Appname,
 		},
 		pop: pop3.New(),
-	}
-	if s.l.JIT() != nil {
-		log.Fatal("failed to initialize luajit")
 	}
 	s.inserv.Handler = s.queueMail
 	s.outserv.Handler = s.handleInetMail

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 )
 
 // bds mail configuration generator
@@ -25,24 +24,20 @@ func main() {
 		maildir = os.Args[2]
 	}
 
-	fmt.Printf("-- auto generated config made %s\n", time.Now().Format(time.ANSIC))
-	fmt.Printf(`i2paddr = "%s"`, i2paddr)
+	fmt.Printf(`i2paddr = %s`, i2paddr)
 	fmt.Printf("\n")
-	fmt.Printf(`i2pkeyfile = "%s"`, keyfile)
+	fmt.Printf(`i2pkeyfile = %s`, keyfile)
 	fmt.Printf("\n")
-	fmt.Printf(`bindmail = "%s"`, bindmail)
+	fmt.Printf(`bindmail = %s`, bindmail)
 	fmt.Printf("\n")
-	fmt.Printf(`bindweb = "%s"`, bindweb)
+	fmt.Printf(`bindweb = %s`, bindweb)
 	fmt.Printf("\n")
-	fmt.Printf(`domain = "%s"`, domain)
+	fmt.Printf(`domain = %s`, domain)
 	fmt.Printf("\n")
-	fmt.Printf(`maildir = "%s"`, maildir)
+	fmt.Printf(`maildir = %s`, maildir)
 	fmt.Printf("\n")
-	fmt.Printf(`database = "%s.sqlite"`, domain)
+	fmt.Printf(`database = %s.sqlite`, domain)
 	fmt.Printf("\n")
-	fmt.Printf(`assets = "%s"`, asset_dir)
+	fmt.Printf(`assets = %s`, asset_dir)
 	fmt.Printf("\n")
-	for _, funcname := range []string{"whitelist", "blacklist", "checkspam"} {
-		fmt.Printf("\n\nfunction %s(addr, recip, sender, body)\n    return 0\nend\n\n", funcname)
-	}
 }

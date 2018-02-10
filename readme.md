@@ -6,8 +6,7 @@
 
 Dependencies:
 
-* gcc 4.8 or higher
-* go 1.6 
+* go 1.9.4
 * git
 * make
 * i2p with SAM enabled
@@ -23,11 +22,11 @@ To build the daemon do:
 
 To generate an initial configuration file run the following:
 
-    $ ./bin/bdsconfig > config.lua
+    $ ./bin/bdsconfig > config.ini
 
 ### Running ###
 
-    $ ./bin/maild config.lua
+    $ ./bin/maild config.ini
 
 ### Email setup ###
 
@@ -51,8 +50,8 @@ if the server is down ding me on xmpp: `jeff@i2p.rocks`
 
 ### Near Future ###
 
-* brain dead simple i2pbote gateway
+* brain dead simple inet/i2p mail relay
 
 ### Future (Eventually) ###
 
-* brain dead simple inet/i2p mail relay
+* brain dead simple i2pbote gateway
