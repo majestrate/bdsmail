@@ -4,8 +4,8 @@ ifdef GOROOT
 	GO = $(GOROOT)/bin/go
 else
 	GO = $(shell which go)
+	GOROOT = $(shell $(GO) env GOROOT)
 endif
-
 
 all: build
 
@@ -15,8 +15,7 @@ build:
 	GOPATH=$(REPO) $(GO) install -v bds/cmd/bdsconfig
 
 clean:
-	go clean -v
-	rm -rf pkg
+	GOPATH=$(REPO) go clean -v
 
 test:
 	GOPATH=$(REPO) go test bds/lib/...
