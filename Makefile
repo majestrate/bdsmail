@@ -15,7 +15,7 @@ build:
 	GOPATH=$(REPO) $(GO) install -v bds/cmd/bdsconfig
 
 clean:
-	GOPATH=$(REPO) go clean -v
-
+	GOPATH=$(REPO) $(GO) clean -v
+	rm -fr $(REPO)/pkg
 test:
-	GOPATH=$(REPO) go test bds/lib/...
+	GOPATH=$(REPO) $(GO) test bds/lib/...
