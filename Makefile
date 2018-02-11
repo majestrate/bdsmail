@@ -1,15 +1,22 @@
+REPO := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+
+ifdef GOROOT
+	GO = $(GOROOT)/bin/go
+else
+	GO = $(shell which go)
+endif
 
 
 all: build
 
 build:
-	GOPATH=$(PWD) go install -v bds/cmd/maild
-	GOPATH=$(PWD) go install -v bds/cmd/newmail
-	GOPATH=$(PWD) go install -v bds/cmd/bdsconfig
+	GOPATH=$(REPO) $(GO) install -v bds/cmd/maild
+	GOPATH=$(REPO) $(GO) install -v bds/cmd/newmail
+	GOPATH=$(REPO) $(GO) install -v bds/cmd/bdsconfig
 
 clean:
 	go clean -v
 	rm -rf pkg
 
 test:
-	go test bds/lib/...
+	GOPATH=$(REPO) go test bds/lib/...
