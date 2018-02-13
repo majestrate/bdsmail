@@ -1,5 +1,10 @@
 ![logo](logo.png "logo")
 
+![Downloads](https://img.shields.io/github/downloads/majestrate/bdsmail/total.svg)
+
+![Logo is ebin](https://img.shields.io/badge/logo-ebin-brightgreen.svg)
+
+
 # Brain Dead Simple Mail Server ᴮᴱᵀᴬ #
 
 ### Building From Source ###

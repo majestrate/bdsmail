@@ -13,7 +13,7 @@ import (
 func main() {
 
 	if len(os.Args) < 4 {
-		log.Errorf("Usage: %s config.lua username maildirpath [password]", os.Args[0])
+		log.Errorf("Usage: %s config.ini username maildirpath [password]", os.Args[0])
 		return
 	}
 
