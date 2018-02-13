@@ -1,10 +1,10 @@
 package sendmail
 
 import (
+	"bds/lib/smtp"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"io"
-	"net/smtp"
 	"os"
 	"strings"
 	"time"
@@ -104,29 +104,34 @@ func (d *RemoteDeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 	// open file
 	f, err = os.Open(d.fpath)
 	if err != nil {
+		log.Errorf("failed to open file, %s", err.Error())
 		return
 	}
 	defer f.Close()
 	// mail from
 	err = cl.Mail(d.from)
 	if err != nil {
+		log.Errorf("mail: %s", err.Error())
 		return
 	}
 	// recpt to
 	err = cl.Rcpt(d.recip)
 	if err != nil {
+		log.Errorf("rcpt %s: %s", d.recip, err.Error())
 		return
 	}
 	// data
 	var wr io.WriteCloser
 	wr, err = cl.Data()
 	if err != nil {
+		log.Errorf("data: %s", err.Error())
 		return
 	}
 	// write body
 	var buff [2048]byte
 	_, err = io.CopyBuffer(wr, f, buff[:])
-	if err != nil {
+	if err != io.EOF && err != nil {
+		log.Errorf("write: %s", err.Error())
 		return
 	}
 	// ... flush
@@ -135,6 +140,6 @@ func (d *RemoteDeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 		return
 	}
 	// reset
-	// err = cl.Reset()
+	err = cl.Reset()
 	return
 }

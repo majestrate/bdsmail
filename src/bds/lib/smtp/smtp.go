@@ -22,10 +22,18 @@ var (
 	mailFromRE = regexp.MustCompile(`[Ff][Rr][Oo][Mm]:<(.*)>`) // Delivery Status Notifications are sent with "MAIL FROM:<>"
 )
 
+type Client struct {
+	smtp.Client
+}
+
 // create a new smtp client
 // wrapper function
-func NewClient(conn net.Conn, host string) (*smtp.Client, error) {
-	return smtp.NewClient(conn, host)
+func NewClient(conn net.Conn, host string) (*Client, error) {
+	cl, err := smtp.NewClient(conn, host)
+	if err == nil {
+		return &Client{*cl}, nil
+	}
+	return nil, err
 }
 
 // smtp message handler
@@ -120,15 +128,13 @@ func (s *session) serve() {
 		switch cmd {
 		case "EHLO", "HELO":
 			s.remoteName = args
-			more := ""
+			c.PrintfLine("250 %s Hello %s", s.srv.Hostname, s.remoteName)
 			if s.srv.Auth != nil && cmd == "EHLO" {
-				more = "250 AUTH PLAIN"
+				c.PrintfLine("250 AUTH PLAIN")
 				if s.srv.TLS != nil {
-					more += "\r\n250 STARTTLS"
+					c.PrintfLine("250 STARTTLS")
 				}
 			}
-			fmt.Fprintf(c.W, "250 %s Hello %s\r\n250 ENHANCEDSTATUSCODES\r\n%s", s.srv.Hostname, s.remoteName, more)
-			c.PrintfLine("")
 			from = ""
 			to = nil
 			body.Reset()

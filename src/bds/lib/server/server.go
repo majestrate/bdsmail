@@ -11,6 +11,7 @@ import (
 	"bds/lib/sendmail"
 	"bds/lib/smtp"
 	"bds/lib/starttls"
+	"bds/lib/util"
 	"bds/lib/web"
 	"crypto/tls"
 	"errors"
@@ -56,7 +57,7 @@ type Server struct {
 	// listener for pop3 server
 	poplistener net.Listener
 	// stream session with i2p router
-	session i2p.StreamSession
+	session i2p.Session
 	// listener for web server
 	weblistener net.Listener
 	// recv mail events from handlers
@@ -113,9 +114,11 @@ func (s *Server) Bind() (err error) {
 	if !ok {
 		i2paddr = "127.0.0.1:7656"
 	}
+	name := util.RandStr(5)
 	log.Info("Starting up I2P connection... hang tight we'll get there")
 	// craete session
-	session, err := i2p.NewSessionEasy(i2paddr, keyfile)
+	session := i2p.NewSession(name, i2paddr, keyfile, make(map[string]string))
+	err = session.Open()
 	if err == nil {
 		// made session
 
@@ -314,9 +317,8 @@ func (s *Server) Run() {
 	go func() {
 		log.Info("Outbound mail flusher started")
 		for s.mailer != nil {
-			// send keepalive messages
-			s.mailer.KeepAlive()
 			// flush outbound messages
+			s.KeepAlive()
 			s.flushOutboundMailQueue()
 			time.Sleep(time.Second * 10)
 		}

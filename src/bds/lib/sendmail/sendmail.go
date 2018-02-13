@@ -2,10 +2,10 @@ package sendmail
 
 import (
 	"bds/lib/mailstore"
+	"bds/lib/smtp"
 	"errors"
 	log "github.com/Sirupsen/logrus"
 	"net"
-	"net/smtp"
 	"sync"
 )
 
@@ -81,16 +81,6 @@ func (s *Mailer) foreach(visitor func(*smtp.Client) error) {
 	}
 }
 
-// send keepalive to all connections in pool
-func (s *Mailer) KeepAlive() {
-	s.foreach(func(cl *smtp.Client) error {
-		// send NOOP command and read response
-		cl.Text.PrintfLine("NOOP")
-		_, err := cl.Text.ReadLine()
-		return err
-	})
-}
-
 // delete connection from pool
 func (s *Mailer) delConn(addr string) {
 	s.cmtx.Lock()
@@ -110,6 +100,7 @@ func (s *Mailer) visitConn(n, addr, localname string, dialer Dialer, visitor fun
 	if err == nil {
 		err = c.visit(visitor)
 		if err != nil {
+			log.Errorf("failed to visit connection: %s", err.Error())
 			s.delConn(addr)
 		}
 	}
@@ -119,9 +110,9 @@ func (s *Mailer) visitConn(n, addr, localname string, dialer Dialer, visitor fun
 // get connection from pool, create if not there
 func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection, err error) {
 	s.cmtx.Lock()
+	defer s.cmtx.Unlock()
 	var ok bool
 	sc, ok = s.conns[addr]
-	s.cmtx.Unlock()
 	if !ok {
 		var c net.Conn
 		c, err = dial(n, addr)
@@ -130,10 +121,12 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 			var cl *smtp.Client
 			cl, err = smtp.NewClient(c, addr)
 			if err != nil {
+				log.Errorf("failed to dial: %s", err.Error())
 				return
 			}
 			err = cl.Hello(localname)
 			if err != nil {
+				log.Errorf("failed to helo: %s", err.Error())
 				cl.Quit()
 				return
 			}
@@ -142,9 +135,7 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 				addr: addr,
 			}
 			// success
-			s.cmtx.Lock()
 			s.conns[addr] = sc
-			s.cmtx.Unlock()
 		}
 	}
 	return
@@ -153,7 +144,7 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 // try delivering mail
 // returns a DeliveryJob that can be cancelled
 func (s *Mailer) Deliver(recip, from string, msg mailstore.Message) (d DeliverJob) {
-	log.Infof("Delivering  mail to %s from %s", recip, from)
+	log.Infof("Delivering %s to %s from %s", msg.Filepath(), recip, from)
 	dialer := s.Dial
 	if dialer == nil {
 		dialer = net.Dial
