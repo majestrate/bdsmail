@@ -16,7 +16,7 @@ type UserUpdater func(*model.User) *model.User
 
 // db abstraction
 type DB interface {
-	// implements maildir.Getter
+	// implements mailsotre.MailRouter
 	mailstore.MailRouter
 	// implements pop3.UserAuthenticator
 	CheckUserLogin(username, password string) (bool, error)

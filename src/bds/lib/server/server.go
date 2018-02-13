@@ -10,7 +10,9 @@ import (
 	"bds/lib/pop3"
 	"bds/lib/sendmail"
 	"bds/lib/smtp"
+	"bds/lib/starttls"
 	"bds/lib/web"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -73,6 +75,8 @@ type Server struct {
 	mailer *sendmail.Mailer
 	// pop3 server
 	pop *pop3.Server
+	// tls config
+	TLS *tls.Config
 }
 
 // bind network services
@@ -448,6 +452,16 @@ func (s *Server) sendOutboundMessage(from string, to []string, msg mailstore.Mes
 	return
 }
 
+func (s *Server) PermitSend(from, username string) bool {
+	user, server := splitEmail(from)
+	return username == user && (server == s.inserv.Hostname || server == s.session.B32())
+}
+
+func (s *Server) Plain(username, password string) bool {
+	good, _ := s.dao.CheckUserLogin(username, password)
+	return good
+}
+
 // handle mail for sending from inet to i2p
 func (s *Server) handleInetMail(remote net.Addr, from string, to []string, fpath string) {
 	log.Debugf("handle send mail from %s", remote)
@@ -535,6 +549,7 @@ func (s *Server) ReloadConfig() (err error) {
 	}
 	str, _ = filepath.Abs(str)
 	log.Info("using outbound mail in ", str)
+	s.outserv.Auth = s
 	s.outserv.Inbound = maildir.MailDir(str)
 	s.outserv.Outbound = maildir.MailQueue(maildir.MailDir(str))
 	err = s.outserv.Outbound.Ensure()
@@ -554,9 +569,30 @@ func (s *Server) ReloadConfig() (err error) {
 			str = "localhost"
 		}
 	}
-	log.Info("Setting mail hostname to ", str)
-	s.inserv.Hostname = str
-	s.outserv.Hostname = "bdsmail"
+	domain := str
+	log.Info("Setting mail hostname to ", domain)
+	s.inserv.Hostname = domain
+	s.outserv.Hostname = domain
+
+	tkey, _ := s.conf.Get("tls_keyfile")
+	if len(tkey) == 0 {
+		tkey = "tls-privkey.pem"
+	}
+
+	tcert, _ := s.conf.Get("tls_cert")
+	if len(tcert) == 0 {
+		tcert = "tls-cert.pem"
+	}
+
+	log.Info("Ensuring TLS key and certs...")
+	s.TLS, err = starttls.GenTLS(domain, "bdsmail", tcert, tkey, 2048)
+	if err != nil {
+		log.Errorf("failed to generate tls key/cert: %s", err.Error())
+		return
+	}
+	s.outserv.TLS = s.TLS
+	s.pop.TLS = s.TLS
+
 	// only initialize dao if not initialized
 	if s.dao == nil {
 		str, _ = s.conf.Get("database")

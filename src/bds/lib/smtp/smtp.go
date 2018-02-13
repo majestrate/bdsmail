@@ -2,7 +2,10 @@ package smtp
 
 import (
 	"bds/lib/mailstore"
+	"bds/lib/starttls"
 	"bytes"
+	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"io"
@@ -49,22 +52,25 @@ type Server struct {
 	Inbound mailstore.Store
 	// outbound mail queue
 	Outbound mailstore.SendQueue
+	// user authenticator for sending mail
+	Auth Auth
+	// TLS Config
+	TLS *tls.Config
 }
 
 type session struct {
 	srv        *Server
 	conn       *textproto.Conn
-	raddr      net.Addr
-	laddr      net.Addr
+	nc         net.Conn
 	remoteName string
+	user       string
 }
 
 func (s *Server) newSession(conn net.Conn) *session {
 	return &session{
-		srv:   s,
-		conn:  textproto.NewConn(conn),
-		raddr: conn.RemoteAddr(),
-		laddr: conn.LocalAddr(),
+		srv:  s,
+		conn: textproto.NewConn(conn),
+		nc:   conn,
 	}
 }
 
@@ -114,7 +120,15 @@ func (s *session) serve() {
 		switch cmd {
 		case "EHLO", "HELO":
 			s.remoteName = args
-			c.PrintfLine("250 %s greets %s", s.srv.Hostname, s.remoteName)
+			more := ""
+			if s.srv.Auth != nil && cmd == "EHLO" {
+				more = "250 AUTH PLAIN"
+				if s.srv.TLS != nil {
+					more += "\r\n250 STARTTLS"
+				}
+			}
+			fmt.Fprintf(c.W, "250 %s Hello %s\r\n250 ENHANCEDSTATUSCODES\r\n%s", s.srv.Hostname, s.remoteName, more)
+			c.PrintfLine("")
 			from = ""
 			to = nil
 			body.Reset()
@@ -124,8 +138,12 @@ func (s *session) serve() {
 				// no match
 				c.PrintfLine("501 syntax error in parameters (invalid FROM)")
 			} else {
-				from = match[1]
-				c.PrintfLine("250 Ok")
+				if s.srv.Auth != nil && !s.srv.Auth.PermitSend(match[1], s.user) {
+					c.PrintfLine("450 4.7.1 not authorized to send")
+				} else {
+					from = match[1]
+					c.PrintfLine("250 Ok")
+				}
 			}
 			to = nil
 			body.Reset()
@@ -162,7 +180,7 @@ func (s *session) serve() {
 			c.PrintfLine("354 Start giving me the mail yo, end with <CR><LF>.<CR><LF>")
 			// put recvived header
 			now := time.Now().Format("Mon, _2 Jan 2006 22:04:05 -0000 (UTC)")
-			fmt.Fprintf(&body, "Received: from %s (%s [127.0.0.1])\r\n", s.remoteName, s.raddr)
+			fmt.Fprintf(&body, "Received: from %s (%s [127.0.0.1])\r\n", s.remoteName, s.nc.RemoteAddr())
 			fmt.Fprintf(&body, "        by %s (%s) with SMTP\r\n", s.srv.Hostname, s.srv.Appname)
 			fmt.Fprintf(&body, "        for <%s>; %s\r\n", to[0], now)
 			dr := c.DotReader()
@@ -174,7 +192,7 @@ func (s *session) serve() {
 				if s.srv.Handler == nil {
 					// no handler
 				} else {
-					go s.srv.Handler(s.raddr, from, to, msg.Filepath())
+					go s.srv.Handler(s.nc.RemoteAddr(), from, to, msg.Filepath())
 				}
 			}
 			if err == nil {
@@ -186,6 +204,30 @@ func (s *session) serve() {
 			from = ""
 			to = nil
 			body.Reset()
+		case "STARTTLS":
+			nc, e := s.startTLS()
+			if e == nil {
+				c = nc
+			} else {
+				c.Close()
+				return
+			}
+		case "AUTH":
+			if s.srv.Auth == nil {
+				// XXX: should we always succeed?
+				c.PrintfLine("235 2.7.0 Authentication Succeeded")
+			} else {
+				parts := strings.Split(args, " ")
+				if len(parts) > 1 {
+					if parts[0] == "PLAIN" {
+						s.doPlainAuth(c, parts[1])
+					} else {
+						s.failLogin()
+					}
+				} else {
+					c.PrintfLine("535 5.7.8 Authentication credentials invalid")
+				}
+			}
 		case "QUIT":
 			c.PrintfLine("221 %s %s SMTP Closing transmssion channel", s.srv.Hostname, s.srv.Appname)
 			return
@@ -198,4 +240,42 @@ func (s *session) serve() {
 			c.PrintfLine("500 Syntax error, command unrecodnized")
 		}
 	}
+}
+
+func (s *session) startTLS() (conn *textproto.Conn, err error) {
+	if s.srv.TLS == nil {
+		s.conn.PrintfLine("500 No STARTTLS")
+		err = starttls.ErrTlsNotSupported
+	} else {
+		s.conn.PrintfLine("220 Ready to start TLS")
+		conn, _, err = starttls.HandleStartTLS(s.nc, s.srv.TLS)
+	}
+	return
+}
+
+func (s *session) doPlainAuth(c *textproto.Conn, str string) {
+	decoded, e := base64.StdEncoding.DecodeString(str)
+	if e == nil {
+		p := bytes.Split(decoded, []byte{0})
+		if len(p) == 3 {
+			user := string(p[1])
+			passwd := string(p[2])
+			if s.srv.Auth.Plain(user, passwd) {
+				s.user = user
+				c.PrintfLine("235 2.7.0 Authentication Succeeded")
+			} else {
+				s.failLogin()
+			}
+		} else {
+			s.failLogin()
+		}
+	} else {
+		s.failLogin()
+	}
+}
+
+func (s *session) failLogin() error {
+	s.conn.PrintfLine("454 4.7.0 Temporary authentication failure")
+	s.conn.Close()
+	return nil
 }

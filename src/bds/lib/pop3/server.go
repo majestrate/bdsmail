@@ -3,6 +3,7 @@ package pop3
 import (
 	"bds/lib/mailstore"
 	"bufio"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -25,6 +26,8 @@ type Server struct {
 	Auth UserAuthenticator
 	// server name
 	name string
+	// tls config
+	TLS *tls.Config
 }
 
 func New() *Server {

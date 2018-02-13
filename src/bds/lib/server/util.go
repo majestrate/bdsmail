@@ -21,8 +21,16 @@ func parseFromI2PAddr(email string) (name string) {
 
 var re_email = regexp.MustCompile("[a-zA-Z0-9]+@[a-zA-Z0-9]+.b32.i2p")
 
-
 func normalizeEmail(email string) (e string) {
-	e = re_email.FindString(email)
+	e = re_email.Copy().FindString(email)
+	return
+}
+
+func splitEmail(email string) (name, server string) {
+	email = normalizeEmail(email)
+	parts := strings.Split(email, "@")
+	if len(parts) == 2 {
+		name, server = parts[0], parts[1]
+	}
 	return
 }
