@@ -37,6 +37,7 @@ func (q *mailQueue) Pop() (msg mailstore.Message, has bool) {
 	msgs, err = q.md.ListCur()
 	if err == nil && len(msgs) > 0 {
 		msg = msgs[0]
+		has = true
 	}
 	return
 }

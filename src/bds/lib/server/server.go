@@ -373,6 +373,7 @@ func (s *Server) flushOutboundMailQueue() {
 		if !has {
 			return
 		}
+		log.Infof("sending %s", msg.Filename())
 		f, err := os.Open(msg.Filepath())
 		if err == nil {
 			c := textproto.NewConn(f)
