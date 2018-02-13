@@ -26,7 +26,7 @@ func (d MailDir) Ensure() (err error) {
 	_, err = os.Stat(dir)
 	if os.IsNotExist(err) {
 		// create main directory
-		err = os.Mkdir(dir, 0700)
+		err = os.MkdirAll(dir, 0700)
 	}
 	if err == nil {
 		// create subdirs
