@@ -1,9 +1,10 @@
 ![logo](logo.png "logo")
 
-![Logo is ebin](https://img.shields.io/badge/logo-ebin-brightgreen.svg)
-
 
 # Brain Dead Simple Mail Server ᴮᴱᵀᴬ #
+
+![MIT License](https://img.shields.io/github/license/majestrate/bdsmail.svg)
+![Logo is ebin](https://img.shields.io/badge/logo-ebin-brightgreen.svg)
 
 ### Building From Source ###
 
