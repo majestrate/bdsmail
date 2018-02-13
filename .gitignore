@@ -22,9 +22,11 @@ pkg/
 
 # private keys
 *.dat
+*.pem
 
 # lua build files
 *.s
 *.o
 *.a
 *.so
+
