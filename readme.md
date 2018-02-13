@@ -27,6 +27,10 @@ To build the daemon do:
 To generate an initial configuration file run the following:
 
     $ ./bin/bdsconfig > config.ini
+    
+Make sure to set the admin password:
+
+    $ ./bin/mailtool config.ini admin $PWD/mail/admin admin_password_goes_here
 
 ### Running ###
 

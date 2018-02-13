@@ -624,19 +624,6 @@ func (s *Server) ReloadConfig() (err error) {
 				err = dao.VisitAllUsers(func(u *model.User) error {
 					return u.Ensure()
 				})
-				if err == nil {
-					// set admin password if not set
-					dao.VisitUser("admin", func(admin *model.User) error {
-						if admin.Login == "" {
-							return dao.UpdateUser("admin", func(u *model.User) *model.User {
-								// set default login credential
-								u.Login = string(model.NewLoginCred(DEFAULT_ADMIN_LOGIN))
-								return u
-							})
-						}
-						return nil
-					})
-				}
 
 				if err == nil {
 					log.Info("Database ready")

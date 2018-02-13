@@ -11,7 +11,7 @@ all: build
 
 build:
 	GOPATH=$(REPO) $(GO) install -v bds/cmd/maild
-	GOPATH=$(REPO) $(GO) install -v bds/cmd/newmail
+	GOPATH=$(REPO) $(GO) install -v bds/cmd/mailtool
 	GOPATH=$(REPO) $(GO) install -v bds/cmd/bdsconfig
 
 clean:

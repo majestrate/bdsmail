@@ -5,8 +5,8 @@
 # set our mbox type to use maildir
 set mbox_type=Maildir
 
-# set smtp to use bdsmail default smtp server
-set smtp_url=smtp://127.0.0.1:2525/
+# set smtp to use bdsmail default smtp login
+set smtp_url=smtp://admin:admin@127.0.0.1:2525/
 
 # use from header for sending mail
 set use_from=yes
