@@ -318,7 +318,6 @@ func (s *Server) Run() {
 		log.Info("Outbound mail flusher started")
 		for s.mailer != nil {
 			// flush outbound messages
-			s.KeepAlive()
 			s.flushOutboundMailQueue()
 			time.Sleep(time.Second * 10)
 		}
