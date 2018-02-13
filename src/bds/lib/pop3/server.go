@@ -48,18 +48,24 @@ func (s *Server) getMessages(user string) (msgs []mailstore.Message, err error) 
 		err = errors.New("no such local user")
 		return
 	}
-	msgs, err = st.ListNew()
+	var ms []mailstore.Message
+	ms, err = st.ListNew()
 	// move new mail into cur	msgs
-	/*
-		if err == nil {
-			for _, m := range ms {
-				_, err = md.ProcessNew(m)
-				if err != nil {
-					log.Errorf("error processing maildir: %s", err.Error())
-				}
+	if err == nil {
+		for _, m := range ms {
+			_, err = st.Process(m)
+			if err != nil {
+				log.Errorf("error processing maildir: %s", err.Error())
 			}
 		}
-	*/
+	}
+	// get list of messages
+	ms, err = st.List()
+	if err == nil {
+		for _, msg := range ms {
+			msgs = append(msgs, msg)
+		}
+	}
 	return
 }
 
@@ -81,6 +87,8 @@ func (s *Server) obtainMessages(user string) (msgs []mailstore.Message, o int64,
 				o += info.Size()
 			}
 		}
+	} else {
+		log.Errorf("pop3: %s", err.Error())
 	}
 	return
 }

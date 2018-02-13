@@ -167,9 +167,25 @@ func (d MailDir) ListNew() (msgs []mailstore.Message, err error) {
 	return
 }
 
+func (d MailDir) List() (msgs []mailstore.Message, err error) {
+	var m []Message
+	m, err = d.listDir("cur")
+	if err == nil {
+		for _, msg := range m {
+			msgs = append(msgs, msg)
+		}
+	}
+	return
+}
+
 // list currently held messages in this maildir
 func (d MailDir) ListCur() (msgs []Message, err error) {
 	msgs, err = d.listDir("cur")
+	return
+}
+
+func (d MailDir) Process(msg mailstore.Message) (m mailstore.Message, err error) {
+	m, err = d.Process(msg)
 	return
 }
 
