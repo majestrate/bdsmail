@@ -1,7 +1,7 @@
 package pop3
 
 import (
-	"bds/lib/maildir"
+	"bds/lib/mailstore"
 	"bufio"
 	"errors"
 	"fmt"
@@ -19,8 +19,8 @@ type UserAuthenticator func(string, string) (bool, error)
 
 // pop3 server
 type Server struct {
-	// function that obtains a maildir given a user
-	GetMailDir maildir.Getter
+	// obtains a mail store given a user
+	Local mailstore.MailRouter
 	// login authenticator
 	Auth UserAuthenticator
 	// server name
@@ -34,31 +34,32 @@ func New() *Server {
 	}
 }
 
-// get all messages in maildir
-func (s *Server) getMessages(user string) (msgs []maildir.Message, err error) {
-	// get user's maildir
-	var md maildir.MailDir
-	if s.GetMailDir == nil {
-		err = errors.New("could't find maildir")
+// get all messages in mail store
+func (s *Server) getMessages(user string) (msgs []mailstore.Message, err error) {
+	// get user's mail store
+	var st mailstore.Store
+	if s.Local == nil {
+		err = errors.New("could't find mail store")
 		return
 	}
-	md, err = s.GetMailDir.GetMailDir(user)
-	if err != nil {
+	var has bool
+	st, has = s.Local.FindStoreFor(user)
+	if !has {
+		err = errors.New("no such local user")
 		return
 	}
-	// move new mail into cur
-	var ms []maildir.Message
-	ms, err = md.ListNew()
-	if err == nil {
-		for _, m := range ms {
-			_, err = md.ProcessNew(m)
-			if err != nil {
-				log.Errorf("error processing maildir: %s", err.Error())
+	msgs, err = st.ListNew()
+	// move new mail into cur	msgs
+	/*
+		if err == nil {
+			for _, m := range ms {
+				_, err = md.ProcessNew(m)
+				if err != nil {
+					log.Errorf("error processing maildir: %s", err.Error())
+				}
 			}
 		}
-	}
-	// get all current files
-	msgs, err = md.ListCur()
+	*/
 	return
 }
 
@@ -70,7 +71,7 @@ func (s *Server) checkUser(user, passwd string) (allowed bool) {
 }
 
 // get all messages and octet count
-func (s *Server) obtainMessages(user string) (msgs []maildir.Message, o int64, err error) {
+func (s *Server) obtainMessages(user string) (msgs []mailstore.Message, o int64, err error) {
 	msgs, err = s.getMessages(user)
 	if err == nil {
 		for _, msg := range msgs {
@@ -95,11 +96,11 @@ type pop3Session struct {
 	// current user
 	user string
 	// messages we have in this transaction
-	msgs []maildir.Message
+	msgs []mailstore.Message
 	// how many octets we have for all messages
 	octs int64
 	// messages to delete
-	dels []maildir.Message
+	dels []mailstore.Message
 }
 
 // run pop3 session mainloop
@@ -224,7 +225,7 @@ func (p *pop3Session) handleTransactionLine(line string) (err error) {
 	case "STAT":
 		// begin
 		_, err = fmt.Fprintf(p.c.W, "+OK %d %d", len(p.msgs), p.octs)
-		
+
 		if err == nil {
 			// done writing list
 			err = p.c.PrintfLine("")

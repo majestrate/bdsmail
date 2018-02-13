@@ -1,7 +1,7 @@
 package db
 
 import (
-	"bds/lib/maildir"
+	"bds/lib/mailstore"
 	"bds/lib/model"
 )
 
@@ -17,7 +17,7 @@ type UserUpdater func(*model.User) *model.User
 // db abstraction
 type DB interface {
 	// implements maildir.Getter
-	maildir.Getter
+	mailstore.MailRouter
 	// implements pop3.UserAuthenticator
 	CheckUserLogin(username, password string) (bool, error)
 	// ensure that all migrations are done

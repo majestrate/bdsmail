@@ -1,7 +1,7 @@
 package db
 
 import (
-	"bds/lib/maildir"
+	"bds/lib/mailstore"
 	"bds/lib/model"
 	log "github.com/Sirupsen/logrus"
 	"github.com/go-xorm/xorm"
@@ -98,11 +98,11 @@ func (x *xormDB) UpdateUser(email string, up UserUpdater) (err error) {
 }
 
 // get maildir for user given email
-func (x *xormDB) GetMailDir(email string) (md maildir.MailDir, err error) {
-	var u *model.User
-	u, err = x.getUser(email)
+func (x *xormDB) FindStoreFor(email string) (st mailstore.Store, has bool) {
+	u, _ := x.getUser(email)
 	if u != nil {
-		md = u.MailDir()
+		st = u.MailDir()
+		has = true
 	}
 	return
 }

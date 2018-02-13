@@ -1,12 +1,15 @@
 package sendmail
 
 import (
+	"bds/lib/mailstore"
+	"errors"
 	log "github.com/Sirupsen/logrus"
-	"bds/lib/maildir"
 	"net"
 	"net/smtp"
 	"sync"
 )
+
+var ErrNoLocalMailDelivery = errors.New("no local mail store for user")
 
 // mail bounce handler
 // paramters are (recipiant email address, from email address, network related error or nil for regular bounce)
@@ -32,8 +35,8 @@ func (c *connection) Quit() {
 
 // mail delivery
 type Mailer struct {
-	// get maildir for local user
-	LocalMailDir maildir.Getter
+	// get mail storage for local user
+	Local mailstore.MailRouter
 	// a dial function to obtain outbound smtp client
 	Dial Dialer
 	// number of times to try to deliver mail
@@ -149,7 +152,7 @@ func (s *Mailer) getConn(n, addr, localname string, dial Dialer) (sc *connection
 
 // try delivering mail
 // returns a DeliveryJob that can be cancelled
-func (s *Mailer) Deliver(recip, from, fpath string) (d DeliverJob) {
+func (s *Mailer) Deliver(recip, from string, msg mailstore.Message) (d DeliverJob) {
 	log.Infof("Delivering  mail to %s from %s", recip, from)
 	dialer := s.Dial
 	if dialer == nil {
@@ -183,18 +186,13 @@ func (s *Mailer) Deliver(recip, from, fpath string) (d DeliverJob) {
 			}
 			return
 		}
-	} 
-	var md maildir.MailDir
-	if s.LocalMailDir != nil {
-		var err error
-		md, err = s.LocalMailDir.GetMailDir(recip)
-		if err != nil {
-			log.Errorf("error durring delivery: %s", err.Error())
-			return
-		}
+	}
+	var st mailstore.Store
+	if s.Local != nil {
+		st, _ = s.Local.FindStoreFor(recip)
 	}
 
-	if md == "" {
+	if st == nil {
 		d = &RemoteDeliverJob{
 			unlimited: s.Retries == 0,
 			cancel:    false,
@@ -212,15 +210,15 @@ func (s *Mailer) Deliver(recip, from, fpath string) (d DeliverJob) {
 			bounce:    bounce,
 			recip:     recip,
 			from:      from,
-			fpath:     fpath,
+			fpath:     msg.Filepath(),
 			result:    make(chan bool),
 			delivered: s.Success,
 		}
 	} else {
 		d = &LocalDeliverJob{
-			mailDir: md,
+			st:     st,
 			result: make(chan bool),
-			fpath: fpath,
+			fpath:  msg.Filepath(),
 		}
 	}
 	return

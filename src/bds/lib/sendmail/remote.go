@@ -54,7 +54,7 @@ func (d *RemoteDeliverJob) Cancel() {
 
 // wait for completion
 func (d *RemoteDeliverJob) Wait() bool {
-	return <- d.result 
+	return <-d.result
 }
 
 // run delivery
@@ -124,7 +124,8 @@ func (d *RemoteDeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 		return
 	}
 	// write body
-	_, err = io.Copy(wr, f)
+	var buff [2048]byte
+	_, err = io.CopyBuffer(wr, f, buff[:])
 	if err != nil {
 		return
 	}

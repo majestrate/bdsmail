@@ -5,6 +5,7 @@ import (
 	"bds/lib/db"
 	"bds/lib/i2p"
 	"bds/lib/maildir"
+	"bds/lib/mailstore"
 	"bds/lib/model"
 	"bds/lib/pop3"
 	"bds/lib/sendmail"
@@ -132,7 +133,10 @@ func (s *Server) Bind() (err error) {
 			s.mailer.Resolve = func(addr string) (net.Addr, error) {
 				return session.LookupI2P(addr)
 			}
-			s.mailer.LocalMailDir = s
+			s.mailer.Local = s
+			s.mailer.Success = func(recip, from string) {
+				log.Infof("Delievered mail to %s from %s", recip, from)
+			}
 		} else {
 			// close session we got an error setting up local smtp listener
 			session.Close()
@@ -168,7 +172,7 @@ func (s *Server) queueMail(addr net.Addr, from string, to []string, fpath string
 }
 
 // get a local maildir or empty string if it's not local to us
-func (s *Server) GetMailDir(email string) (md maildir.MailDir, err error) {
+func (s *Server) FindStoreFor(email string) (st mailstore.Store, has bool) {
 	email = normalizeEmail(email)
 	if strings.Count(email, "@") == 1 {
 		parts := strings.Split(email, "@")
@@ -176,7 +180,7 @@ func (s *Server) GetMailDir(email string) (md maildir.MailDir, err error) {
 			addr := parts[1]
 			user := parts[0]
 			if addr == s.session.B32() && s.dao != nil {
-				md, err = s.dao.GetMailDir(user)
+				st, has = s.dao.FindStoreFor(user)
 			}
 		}
 	}
@@ -186,14 +190,12 @@ func (s *Server) GetMailDir(email string) (md maildir.MailDir, err error) {
 // we got mail that was not dropped by the filters
 func (s *Server) gotMail(ev *MailEvent) (err error) {
 	log.Info("we got mail for ", ev.Recip, " from ", ev.Sender)
-
-	var md maildir.MailDir
-	md, err = s.GetMailDir(ev.Recip)
-	if md == "" {
-		md, _ = s.dao.GetMailDir("postmaster")
+	st, has := s.FindStoreFor(ev.Recip)
+	if !has {
+		st, _ = s.dao.FindStoreFor("postmaster")
 	}
 	// deliver locally
-	j := sendmail.NewLocalDelivery(md, ev.File)
+	j := sendmail.NewLocalDelivery(st, ev.File)
 	go j.Run()
 	ok := j.Wait()
 	if ok && s.Handler != nil {
@@ -321,7 +323,7 @@ func (s *Server) Run() {
 	go func() {
 		if s.dao != nil {
 			s.pop.Auth = s.dao.CheckUserLogin
-			s.pop.GetMailDir = s.dao
+			s.pop.Local = s.dao
 		}
 		log.Info("Serving POP3 server")
 		err := s.pop.Serve(s.poplistener)
@@ -366,62 +368,63 @@ func (s *Server) allowRecip(recip string) (allow bool) {
 // send all pending outbound messages
 func (s *Server) flushOutboundMailQueue() {
 	log.Debug("flush outbound messages")
-	msgs, err := s.outserv.MailDir.ListNew()
-	if err == nil {
-		var files []string
-		log.Debugf("%d messages to send in", len(msgs), s.inserv.MailDir)
-		var outmsg []maildir.Message
-		for _, msg := range msgs {
-			m, err := s.outserv.MailDir.ProcessNew(msg)
-			if err == nil {
-				outmsg = append(outmsg, m)
-			}
+	for {
+		msg, has := s.outserv.Outbound.Pop()
+		if !has {
+			return
 		}
-		for _, msg := range outmsg {
-			f, err := os.Open(msg.Filepath())
+		f, err := os.Open(msg.Filepath())
+		if err == nil {
+			c := textproto.NewConn(f)
+			hdr, err := c.ReadMIMEHeader()
 			if err == nil {
-				files = append(files, msg.Filepath())
-				c := textproto.NewConn(f)
-				hdr, err := c.ReadMIMEHeader()
-				if err == nil {
-					var to []string
-					var from string
-					from = hdr.Get("From")
-					for _, h := range []string{"To", "Cc", "Bcc"} {
-						vs, ok := hdr[h]
-						if ok {
-							to = append(to, vs...)
-						}
+				var to []string
+				var from string
+				from = hdr.Get("From")
+				for _, h := range []string{"To", "Cc"} {
+					vs, ok := hdr[h]
+					if ok {
+						to = append(to, vs...)
 					}
-					c.Close()
-					go s.sendOutboundMessage(from, to, msg.Filepath())
-				} else {
-					log.Errorf("bad outboud message %s: %s", msg.Filepath(), err.Error())
-					c.Close()
 				}
+				c.Close()
+				go s.sendOutboundMessage(from, to, msg)
 			} else {
-				log.Errorf("no such outbound message %s: %s", msg.Filepath(), err.Error())
+				log.Errorf("bad outboud message %s: %s", msg.Filepath(), err.Error())
+				c.Close()
 			}
+		} else {
+			log.Errorf("failed to open outbound message %s: %s", msg.Filepath(), err.Error())
 		}
-	} else {
-		log.Errorf("failed to find new messages in %s: %s", s.inserv.MailDir, err.Error())
 	}
 }
 
-// send 1 outbound messages
-func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
-	log.Infof("Sending outbound mail %s", fpath)
+// send 1 outbound message
+func (s *Server) sendOutboundMessage(from string, to []string, msg mailstore.Message) {
+	log.Infof("Sending outbound mail %s", msg.Filename())
 	var recips []string
+	servers := make(map[string]int)
 	for _, r := range to {
 		r = normalizeEmail(r)
 		if len(r) > 0 {
 			recips = append(recips, r)
+			parts := strings.Split(r, "@")
+			server := parts[1]
+			// find remove servers
+			if server != s.session.B32() {
+				num, ok := servers[server]
+				if ok {
+					servers[server] = num + 1
+				} else {
+					servers[server] = 1
+				}
+			}
 		}
 	}
 
 	if len(recips) == 0 {
-		log.Warnf("%s not deliverable, no valid recipiants", fpath)
-		os.Remove(fpath)
+		log.Warnf("%s not deliverable, no valid recipiants", msg.Filepath())
+		msg.Remove()
 		return
 	}
 
@@ -430,7 +433,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 	// deliver to all
 	for _, recip := range recips {
 		// fire off delivery job
-		d := s.mailer.Deliver(recip, from, fpath)
+		d := s.mailer.Deliver(recip, from, msg)
 		jobs = append(jobs, d)
 		go d.Run()
 	}
@@ -439,7 +442,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, fpath string) {
 		j.Wait()
 	}
 
-	os.Remove(fpath)
+	msg.Remove()
 
 	return
 }
@@ -517,22 +520,27 @@ func (s *Server) ReloadConfig() (err error) {
 	}
 	str, _ = filepath.Abs(str)
 	log.Info("Using inbound maildir at ", str)
-	s.inserv.MailDir = maildir.MailDir(str)
-	err = s.inserv.MailDir.Ensure()
+	s.inserv.Inbound = maildir.MailDir(str)
+	err = s.inserv.Inbound.Ensure()
 	if err != nil {
 		return
 	}
 	// set pop3 server maildir getter
-	s.pop.GetMailDir = s.dao
+	s.pop.Local = s.dao
 
 	str, _ = s.conf.Get("outbound_maildir")
 	if len(str) == 0 {
 		str = "outbound"
 	}
 	str, _ = filepath.Abs(str)
-	log.Info("using outbond maildir at ", str)
-	s.outserv.MailDir = maildir.MailDir(str)
-	err = s.outserv.MailDir.Ensure()
+	log.Info("using outbound mail in ", str)
+	s.outserv.Inbound = maildir.MailDir(str)
+	s.outserv.Outbound = maildir.MailQueue(maildir.MailDir(str))
+	err = s.outserv.Outbound.Ensure()
+	if err != nil {
+		return
+	}
+	err = s.outserv.Inbound.Ensure()
 	if err != nil {
 		return
 	}

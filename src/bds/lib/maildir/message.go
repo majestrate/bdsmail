@@ -1,6 +1,7 @@
 package maildir
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -14,6 +15,10 @@ func (m Message) Filepath() string {
 func (m Message) Filename() (f string) {
 	_, f = filepath.Split(m.Filepath())
 	return
+}
+
+func (m Message) Remove() error {
+	return os.Remove(m.Filepath())
 }
 
 func (m Message) Name() string {

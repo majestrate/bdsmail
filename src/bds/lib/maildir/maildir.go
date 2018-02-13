@@ -1,6 +1,7 @@
 package maildir
 
 import (
+	"bds/lib/mailstore"
 	"crypto/rand"
 	"fmt"
 	log "github.com/Sirupsen/logrus"
@@ -81,7 +82,7 @@ func (d MailDir) Cur(fname string) (f string) {
 
 // deliver mail to this maildir
 // return messsage that was delivered
-func (d MailDir) Deliver(body io.Reader) (msg Message, err error) {
+func (d MailDir) Deliver(body io.Reader) (msg mailstore.Message, err error) {
 	var oldwd string
 	oldwd, err = os.Getwd()
 	if err == nil {
@@ -155,8 +156,14 @@ func (d MailDir) listDir(sd string) (msgs []Message, err error) {
 }
 
 // list new messages in this maildir
-func (d MailDir) ListNew() (msgs []Message, err error) {
-	msgs, err = d.listDir("new")
+func (d MailDir) ListNew() (msgs []mailstore.Message, err error) {
+	var m []Message
+	m, err = d.listDir("new")
+	if err == nil {
+		for _, msg := range m {
+			msgs = append(msgs, msg)
+		}
+	}
 	return
 }
 

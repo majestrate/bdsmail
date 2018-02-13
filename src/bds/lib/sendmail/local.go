@@ -1,24 +1,23 @@
 package sendmail
 
 import (
+	"bds/lib/mailstore"
 	log "github.com/Sirupsen/logrus"
-	"bds/lib/maildir"
 	"os"
 )
 
-
 type LocalDeliverJob struct {
-	mailDir maildir.MailDir
+	st     mailstore.Store
 	result chan bool
-	fpath string
+	fpath  string
 }
 
 // new local delivery job
-func NewLocalDelivery(md maildir.MailDir, fpath string) DeliverJob {
+func NewLocalDelivery(st mailstore.Store, fpath string) DeliverJob {
 	return &LocalDeliverJob{
-		mailDir: md,
+		st:     st,
 		result: make(chan bool),
-		fpath: fpath,
+		fpath:  fpath,
 	}
 }
 
@@ -29,15 +28,15 @@ func (l *LocalDeliverJob) Cancel() {
 
 // wait for completion
 func (l *LocalDeliverJob) Wait() bool {
-	return <- l.result
+	return <-l.result
 }
 
 // run local delivery
 func (l *LocalDeliverJob) Run() {
-	var msg maildir.Message
+	var msg mailstore.Message
 	f, err := os.Open(l.fpath)
 	if err == nil {
-		msg, err = l.mailDir.Deliver(f)
+		msg, err = l.st.Deliver(f)
 		f.Close()
 	}
 	if err != nil {
@@ -45,5 +44,5 @@ func (l *LocalDeliverJob) Run() {
 		l.result <- false
 	}
 	// inform result
-	l.result <- msg != ""
+	l.result <- msg != nil
 }
