@@ -31,6 +31,10 @@ func main() {
 		return
 	}
 	conf := new(config.Config)
+	if _, err = os.Stat(cfg_fname); err != nil {
+		log.Errorf("failed to load config: %s", err.Error())
+		return
+	}
 	conf.Load(cfg_fname)
 
 	s, ok := conf.Get("database")
