@@ -3,7 +3,8 @@ package config
 import "bds/lib/config/parser"
 
 type Config struct {
-	opts map[string]string
+	opts    map[string]string
+	Aliases AliasConfig
 }
 
 func (c *Config) Get(name string) (val string, ok bool) {
@@ -18,6 +19,10 @@ func (c *Config) Load(fname string) (err error) {
 		s, _ := conf.Section("maild")
 		if s != nil {
 			c.opts = s.Options()
+			a := s.ValueOf("aliases")
+			if a != "" {
+				err = c.Aliases.Load(a)
+			}
 		}
 	}
 	return

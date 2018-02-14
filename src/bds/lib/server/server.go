@@ -253,7 +253,7 @@ func (s *Server) runFilter(filtername string, ev *MailEvent) int {
 // check that a remote address is valid for the recipiant
 // this can block for a bit
 func (s *Server) i2pSenderIsValid(addr string, from string) (valid bool) {
-	fromAddr := parseFromI2PAddr(normalizeEmail(from))
+	fromAddr := s.parseFromI2PAddr(normalizeEmail(from))
 	if len(fromAddr) > 0 {
 		tries := 16
 		for tries > 0 {
@@ -393,7 +393,7 @@ func (s *Server) Run() {
 func (s *Server) allowRecip(recip string) (allow bool) {
 	if s.Handler == nil {
 		// allow recip that only match the hostname of the server or the base32 address of the server
-		addr := parseFromI2PAddr(recip)
+		addr := s.parseFromI2PAddr(recip)
 		allow = addr == s.session.B32() || addr == s.inserv.Hostname
 	} else {
 		// custom mail handler
@@ -498,7 +498,7 @@ func (s *Server) Plain(username, password string) bool {
 // handle mail for sending from inet to i2p
 func (s *Server) handleInetMail(remote net.Addr, from string, to []string, fpath string) {
 	log.Debugf("handle send mail from %s", remote)
-	us := parseFromI2PAddr(from)
+	us := s.parseFromI2PAddr(from)
 	if us == s.inserv.Hostname || us == s.session.B32() {
 		// accepted for outbound mail
 		log.Infof("outbound message queued: %s", fpath)
