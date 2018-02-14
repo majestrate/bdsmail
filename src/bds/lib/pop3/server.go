@@ -292,7 +292,7 @@ func (p *pop3Session) handleLine(line string) (err error) {
 	cmd := strings.ToUpper(parts[0])
 	c := p.c
 	switch cmd {
-	case "STARTTLS":
+	case "STLS":
 		if p.s.TLS == nil {
 			err = p.Error("no TLS supported")
 		} else {
