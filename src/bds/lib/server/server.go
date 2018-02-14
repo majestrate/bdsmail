@@ -261,7 +261,7 @@ func (s *Server) i2pSenderIsValid(addr string, from string) (valid bool) {
 	if len(fromAddr) > 0 {
 		tries := 16
 		for tries > 0 {
-			log.Infof("looking up recipiant address %s", fromAddr)
+			log.Infof("looking up recipiant address %s for %s", fromAddr, from)
 			raddr, err := s.session.LookupI2P(fromAddr)
 			if err == nil {
 				// lookup worked
@@ -284,6 +284,7 @@ func (s *Server) filterMail(ev *MailEvent) (err error) {
 	if !s.i2pSenderIsValid(ev.Addr, ev.Sender) {
 		// bad address
 		log.Warnf("bad i2p address from %s", ev.Sender)
+		err = errors.New("Bad i2p address")
 		return
 	}
 
@@ -505,12 +506,12 @@ func (s *Server) Plain(username, password string) bool {
 // handle mail for sending from inet to i2p
 func (s *Server) handleInetMail(remote net.Addr, from string, to []string, fpath string) {
 	log.Debugf("handle send mail from %s", remote)
-	us := s.parseFromI2PAddr(from)
-	if us == s.inserv.Hostname || us == s.session.B32() {
+	parts := strings.Split(from, "@")
+	if len(parts) == 2 && (parts[1] == s.inserv.Hostname || parts[1] == s.session.B32()) {
 		// accepted for outbound mail
 		log.Infof("outbound message queued: %s", fpath)
 	} else {
-		log.Errorf("bad outbound mail from %s", us)
+		log.Errorf("bad outbound mail from %s", from)
 		// remove file
 		os.Remove(fpath)
 	}
