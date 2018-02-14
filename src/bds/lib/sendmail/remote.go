@@ -92,7 +92,7 @@ func (d *RemoteDeliverJob) Run() {
 	log.Errorf("delivery of message to %s failed", d.recip)
 	if d.bounce != nil {
 		// call bounce hook as needed
-		d.bounce(d.recip, d.from, err)
+		d.bounce(d.recip, d.from, d.fpath, err)
 	}
 	// inform waiting
 	d.result <- false

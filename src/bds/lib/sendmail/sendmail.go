@@ -12,8 +12,8 @@ import (
 var ErrNoLocalMailDelivery = errors.New("no local mail store for user")
 
 // mail bounce handler
-// paramters are (recipiant email address, from email address, network related error or nil for regular bounce)
-type Bouncer func(string, string, error)
+// paramters are (recipiant email address, from email address, the filepath of the message, network related error or nil for regular bounce)
+type Bouncer func(string, string, string, error)
 
 type connection struct {
 	addr   string

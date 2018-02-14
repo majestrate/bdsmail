@@ -2,11 +2,11 @@ package smtp
 
 import (
 	"bds/lib/mailstore"
+	mail "bds/lib/mailutil"
 	"bds/lib/starttls"
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
-	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"io"
 	"net"
@@ -14,7 +14,6 @@ import (
 	"net/textproto"
 	"regexp"
 	"strings"
-	"time"
 )
 
 var (
@@ -186,10 +185,7 @@ func (s *session) serve() {
 			// read mail body
 			c.PrintfLine("354 Start giving me the mail yo, end with <CR><LF>.<CR><LF>")
 			// put recvived header
-			now := time.Now().Format("Mon, _2 Jan 2006 22:04:05 -0000 (UTC)")
-			fmt.Fprintf(&body, "Received: from %s (%s [127.0.0.1])\r\n", s.remoteName, s.nc.RemoteAddr())
-			fmt.Fprintf(&body, "        by %s (%s) with SMTP\r\n", s.srv.Hostname, s.srv.Appname)
-			fmt.Fprintf(&body, "        for <%s>; %s\r\n", to[0], now)
+			err = mail.WriteRecvHeader(&body, to[0], s.remoteName, s.nc.RemoteAddr().String(), s.srv.Hostname, s.srv.Appname)
 			dr := c.DotReader()
 			// deliver to maildir
 			mr := io.MultiReader(&body, dr)

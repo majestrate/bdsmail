@@ -6,6 +6,7 @@ import (
 	"bds/lib/i2p"
 	"bds/lib/maildir"
 	"bds/lib/mailstore"
+	mail "bds/lib/mailutil"
 	"bds/lib/model"
 	"bds/lib/pop3"
 	"bds/lib/sendmail"
@@ -13,6 +14,7 @@ import (
 	"bds/lib/starttls"
 	"bds/lib/util"
 	"bds/lib/web"
+	"bytes"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -144,12 +146,42 @@ func (s *Server) Bind() (err error) {
 			s.mailer.Success = func(recip, from string) {
 				log.Infof("Delievered mail to %s from %s", recip, from)
 			}
+			s.mailer.Bounce = s.Bounce
 		} else {
 			// close session we got an error setting up local smtp listener
 			session.Close()
 		}
 	}
 	return
+}
+
+func (s *Server) Bounce(recip, from, fpath string, e error) {
+
+	buff := new(bytes.Buffer)
+	mail.WriteRecvHeader(buff, from, "127.0.0.1", "127.0.0.1", s.outserv.Hostname, s.outserv.Appname)
+	f, err := os.Open(fpath)
+	if err == nil {
+		reason := "unknown error"
+		if e != nil {
+			reason = e.Error()
+		}
+		mail.WriteBounceMail(buff, from, reason, f)
+		f.Close()
+		st, ok := s.FindStoreFor(from)
+		if ok {
+			var msg mailstore.Message
+			msg, err = st.Deliver(buff)
+			if err == nil {
+				log.Infof("wrote bounce mail to %s", msg.Filepath())
+			} else {
+				log.Errorf("failed to deliver bounce: %s", err.Error())
+			}
+		} else {
+			log.Errorf("failed to find mail store for %s", from)
+		}
+	} else {
+		log.Errorf("failed to open mail message for bounce: %s", err.Error())
+	}
 }
 
 // dial out
@@ -169,7 +201,7 @@ func (s *Server) queueMail(addr net.Addr, from string, to []string, fpath string
 	// for each recip fire a mail event
 	for _, recip := range to {
 		ev := &MailEvent{
-			Addr:   addr,
+			Addr:   addr.String(),
 			Sender: from,
 			Recip:  recip,
 			File:   fpath,
@@ -220,7 +252,7 @@ func (s *Server) runFilter(filtername string, ev *MailEvent) int {
 
 // check that a remote address is valid for the recipiant
 // this can block for a bit
-func (s *Server) i2pSenderIsValid(addr net.Addr, from string) (valid bool) {
+func (s *Server) i2pSenderIsValid(addr string, from string) (valid bool) {
 	fromAddr := parseFromI2PAddr(normalizeEmail(from))
 	if len(fromAddr) > 0 {
 		tries := 16
@@ -229,7 +261,7 @@ func (s *Server) i2pSenderIsValid(addr net.Addr, from string) (valid bool) {
 			raddr, err := s.session.LookupI2P(fromAddr)
 			if err == nil {
 				// lookup worked
-				valid = raddr.String() == addr.String()
+				valid = raddr.String() == addr
 				break
 			} else {
 				log.Warnf("could not lookup %s", fromAddr)
@@ -415,7 +447,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, msg mailstore.Mes
 			recips = append(recips, r)
 			parts := strings.Split(r, "@")
 			server := parts[1]
-			// find remove servers
+			// find remote servers
 			if server != s.session.B32() {
 				num, ok := servers[server]
 				if ok {
@@ -429,6 +461,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, msg mailstore.Mes
 
 	if len(recips) == 0 {
 		log.Warnf("%s not deliverable, no valid recipiants", msg.Filepath())
+		s.Bounce("", from, msg.Filepath(), errors.New("mail not deliverable"))
 		msg.Remove()
 		return
 	}
