@@ -43,7 +43,7 @@ func (k *Keyfile) Load() (err error) {
 }
 
 func (k *Keyfile) write(w io.Writer) (err error) {
-	_, err = fmt.Fprintf(w, "%s\n%s\n", k.privkey, k.pubkey)
+	_, err = fmt.Fprintf(w, "%s\n%s\n", k.pubkey, k.privkey)
 	return
 }
 
@@ -51,8 +51,8 @@ func (k *Keyfile) read(r io.Reader) (err error) {
 	br := bufio.NewReader(r)
 	k.privkey, err = br.ReadString(10)
 	k.pubkey, err = br.ReadString(10)
-	k.privkey = strings.Trim(k.privkey, "\n")
-	k.pubkey = strings.Trim(k.pubkey, "\n")
+	k.privkey = strings.Trim(k.pubkey, "\n")
+	k.pubkey = strings.Trim(k.privkey, "\n")
 	return
 }
 
