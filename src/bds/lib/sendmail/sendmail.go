@@ -195,7 +195,7 @@ func (s *Mailer) Deliver(recip, from string, msg mailstore.Message) (d DeliverJo
 					r_addr := parts[1]
 					a, err := resolver(r_addr)
 					if err == nil {
-						err = s.visitConn(a.Network(), r_addr, r_addr, dialer, f)
+						err = s.visitConn(a.Network(), a.String(), r_addr, dialer, f)
 					} else {
 						log.Warnf("failed to resolve %s: %s", r_addr, err.Error())
 					}
