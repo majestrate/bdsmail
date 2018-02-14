@@ -140,6 +140,10 @@ func (s *Server) Bind() (err error) {
 			s.mailer.Retries = 10
 			s.mailer.Dial = session.Dial
 			s.mailer.Resolve = func(addr string) (net.Addr, error) {
+				a, ok := s.conf.Aliases.MX(addr)
+				if ok {
+					addr = a
+				}
 				return session.LookupI2P(addr)
 			}
 			s.mailer.Local = s

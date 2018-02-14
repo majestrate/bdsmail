@@ -6,6 +6,7 @@ import (
 	"errors"
 	log "github.com/Sirupsen/logrus"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -189,14 +190,20 @@ func (s *Mailer) Deliver(recip, from string, msg mailstore.Message) (d DeliverJo
 			cancel:    false,
 			retries:   s.Retries,
 			visit: func(f func(*smtp.Client) error) error {
-				r_addr := extractAddr(recip)
-				a, err := resolver(r_addr)
-				if err == nil {
-					err = s.visitConn(a.Network(), r_addr, extractAddr(from), dialer, f)
+				parts := strings.Split(recip, "@")
+				if len(parts) == 2 {
+					r_addr := parts[1]
+					a, err := resolver(r_addr)
+					if err == nil {
+						err = s.visitConn(a.Network(), r_addr, r_addr, dialer, f)
+					} else {
+						log.Warnf("failed to resolve %s: %s", r_addr, err.Error())
+					}
+					return err
 				} else {
-					log.Warnf("failed to resolve %s: %s", r_addr, err.Error())
+					log.Warnf("bad email address %s", recip)
 				}
-				return err
+				return nil
 			},
 			bounce:    bounce,
 			recip:     recip,

@@ -2,11 +2,9 @@ package sendmail
 
 import (
 	"bds/lib/smtp"
-	"fmt"
 	log "github.com/Sirupsen/logrus"
 	"io"
 	"os"
-	"strings"
 	"time"
 )
 
@@ -26,25 +24,6 @@ type RemoteDeliverJob struct {
 	fpath string
 
 	result chan bool
-}
-
-func extractAddr(email string) (addr string) {
-	if strings.HasSuffix(email, "@") {
-		addr = "localhost"
-	} else {
-		idx_at := strings.Index(email, "@")
-		if strings.HasSuffix(email, ".b32.i2p") {
-			addr = email[idx_at+1:]
-		} else if strings.HasSuffix(email, ".i2p") {
-			idx_i2p := strings.LastIndex(email, ".i2p")
-			addr = fmt.Sprintf("smtp.%s.i2p", email[idx_at+1:idx_i2p])
-		} else {
-			addr = email[idx_at+1:]
-		}
-	}
-	addr = strings.Trim(addr, ",= \t\r\n\f\b")
-	return
-
 }
 
 // cancel delivery
