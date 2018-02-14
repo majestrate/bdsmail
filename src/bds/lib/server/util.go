@@ -12,7 +12,7 @@ func (s *Server) parseFromI2PAddr(email string) (name string) {
 	if strings.HasSuffix(email, ".b32.i2p") {
 		name = email[idx_at+1:]
 	} else if strings.HasSuffix(email, ".i2p") {
-		addr, ok := s.conf.Aliases.MX(email)
+		addr, ok := s.conf.Aliases.MX(email[idx_at+1:])
 		if ok {
 			name = addr
 		} else {
