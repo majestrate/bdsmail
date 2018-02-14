@@ -257,7 +257,8 @@ func (s *Server) runFilter(filtername string, ev *MailEvent) int {
 // check that a remote address is valid for the recipiant
 // this can block for a bit
 func (s *Server) i2pSenderIsValid(addr string, from string) (valid bool) {
-	fromAddr := s.parseFromI2PAddr(normalizeEmail(from))
+	from = normalizeEmail(from)
+	fromAddr := s.parseFromI2PAddr(from)
 	if len(fromAddr) > 0 {
 		tries := 16
 		for tries > 0 {
@@ -268,7 +269,7 @@ func (s *Server) i2pSenderIsValid(addr string, from string) (valid bool) {
 				valid = raddr.String() == addr
 				break
 			} else {
-				log.Warnf("could not lookup %s", fromAddr)
+				log.Warnf("could not lookup %s, %s", fromAddr, err.Error())
 				tries--
 			}
 		}
