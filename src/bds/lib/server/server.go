@@ -220,9 +220,8 @@ func (s *Server) FindStoreFor(email string) (st mailstore.Store, has bool) {
 	if strings.Count(email, "@") == 1 {
 		parts := strings.Split(email, "@")
 		if len(parts) == 2 {
-			addr := parts[1]
 			user := parts[0]
-			if addr == s.session.B32() && s.dao != nil {
+			if s.dao != nil {
 				st, has = s.dao.FindStoreFor(user)
 			}
 		}
