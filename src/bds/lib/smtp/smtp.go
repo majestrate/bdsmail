@@ -128,18 +128,19 @@ func (s *session) serve() {
 		switch cmd {
 		case "EHLO", "HELO":
 			s.remoteName = args
-			c.PrintfLine("250 %s Hello %s", s.srv.Hostname, s.remoteName)
+			c.PrintfLine("250-%s Hello %s", s.srv.Hostname, s.remoteName)
 			if s.srv.Auth != nil && cmd == "EHLO" {
-				c.PrintfLine("250 AUTH PLAIN")
+				c.PrintfLine("250-AUTH PLAIN")
 				if s.srv.TLS != nil {
-					c.PrintfLine("250 STARTTLS")
+					c.PrintfLine("250-STARTTLS")
 				}
 			}
+			c.PrintfLine("250 HELP")
 			from = ""
 			to = nil
 			body.Reset()
 		case "MAIL":
-			match := mailFromRE.FindStringSubmatch(args)
+			match := mailFromRE.Copy().FindStringSubmatch(args)
 			if match == nil {
 				// no match
 				c.PrintfLine("501 syntax error in parameters (invalid FROM)")
@@ -162,19 +163,19 @@ func (s *session) serve() {
 		case "RCPT":
 			if from == "" {
 				c.PrintfLine("503 bad sequence of commands")
-				break
-			}
-			match := rcptToRE.FindStringSubmatch(args)
-			if match == nil {
-				// no match
-				c.PrintfLine("501 syntax error in parameters (invalid TO)")
 			} else {
-				if len(to) == 100 {
-					// too many recipiants
-					c.PrintfLine("452 too many recipients")
+				match := rcptToRE.Copy().FindStringSubmatch(args)
+				if match == nil {
+					// no match
+					c.PrintfLine("501 syntax error in parameters (invalid TO)")
 				} else {
-					to = append(to, match[1])
-					c.PrintfLine("250 Ok")
+					if len(to) == 100 {
+						// too many recipiants
+						c.PrintfLine("452 too many recipients")
+					} else {
+						to = append(to, match[1])
+						c.PrintfLine("250 Ok")
+					}
 				}
 			}
 		case "DATA":
@@ -255,6 +256,9 @@ func (s *session) startTLS() (conn *textproto.Conn, err error) {
 	} else {
 		s.conn.PrintfLine("220 Ready to start TLS")
 		conn, _, err = starttls.HandleStartTLS(s.nc, s.srv.TLS)
+		if err != nil {
+			log.Errorf("starttls error: %s", err.Error())
+		}
 	}
 	return
 }

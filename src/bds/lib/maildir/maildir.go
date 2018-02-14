@@ -185,7 +185,7 @@ func (d MailDir) ListCur() (msgs []Message, err error) {
 }
 
 func (d MailDir) Process(msg mailstore.Message) (m mailstore.Message, err error) {
-	m, err = d.Process(msg)
+	m, err = d.ProcessNew(Message(msg.Filepath()))
 	return
 }
 

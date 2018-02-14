@@ -455,6 +455,7 @@ func (s *Server) sendOutboundMessage(from string, to []string, msg mailstore.Mes
 
 func (s *Server) PermitSend(from, username string) bool {
 	user, server := splitEmail(from)
+	log.Infof("username=%s user=%s server=%s", username, user, server)
 	return username == user && (server == s.inserv.Hostname || server == s.session.B32())
 }
 

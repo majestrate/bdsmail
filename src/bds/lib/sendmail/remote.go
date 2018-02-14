@@ -109,15 +109,19 @@ func (d *RemoteDeliverJob) tryDeliver(cl *smtp.Client) (err error) {
 	}
 	defer f.Close()
 	// mail from
-	err = cl.Mail(d.from)
+	var line string
+	var code int
+	err = cl.Text.PrintfLine("MAIL FROM:%s", d.from)
+	code, line, err = cl.Text.ReadCodeLine(250)
 	if err != nil {
-		log.Errorf("mail: %s", err.Error())
+		log.Errorf("mail: [%d %s] %s", code, line, err.Error())
 		return
 	}
 	// recpt to
-	err = cl.Rcpt(d.recip)
+	err = cl.Text.PrintfLine("RCPT TO:%s", d.recip)
+	code, line, err = cl.Text.ReadCodeLine(250)
 	if err != nil {
-		log.Errorf("rcpt %s: %s", d.recip, err.Error())
+		log.Errorf("rcpt [%d %s] %s: %s", code, line, d.recip, err.Error())
 		return
 	}
 	// data
