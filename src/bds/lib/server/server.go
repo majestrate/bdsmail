@@ -397,8 +397,11 @@ func (s *Server) Run() {
 func (s *Server) allowRecip(recip string) (allow bool) {
 	if s.Handler == nil {
 		// allow recip that only match the hostname of the server or the base32 address of the server
-		addr := s.parseFromI2PAddr(recip)
-		allow = addr == s.session.B32() || addr == s.inserv.Hostname
+		parts := strings.Split(recip, "@")
+		if len(parts) == 2 {
+			addr := parts[1]
+			allow = addr == s.session.B32() || addr == s.inserv.Hostname
+		}
 	} else {
 		// custom mail handler
 		allow = s.Handler.AllowRecipiant(recip)
