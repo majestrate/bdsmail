@@ -378,7 +378,6 @@ func (s *Server) flushOutboundMailQueue() {
 		if !has {
 			return
 		}
-		log.Infof("sending %s", msg.Filename())
 		f, err := os.Open(msg.Filepath())
 		if err == nil {
 			c := textproto.NewConn(f)
@@ -455,7 +454,6 @@ func (s *Server) sendOutboundMessage(from string, to []string, msg mailstore.Mes
 
 func (s *Server) PermitSend(from, username string) bool {
 	user, server := splitEmail(from)
-	log.Infof("username=%s user=%s server=%s", username, user, server)
 	return username == user && (server == s.inserv.Hostname || server == s.session.B32())
 }
 
