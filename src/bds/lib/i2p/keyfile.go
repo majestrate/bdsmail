@@ -49,10 +49,10 @@ func (k *Keyfile) write(w io.Writer) (err error) {
 
 func (k *Keyfile) read(r io.Reader) (err error) {
 	br := bufio.NewReader(r)
-	k.privkey, err = br.ReadString(10)
 	k.pubkey, err = br.ReadString(10)
-	k.privkey = strings.Trim(k.pubkey, "\n")
-	k.pubkey = strings.Trim(k.privkey, "\n")
+	k.privkey, err = br.ReadString(10)
+	k.pubkey = strings.Trim(k.pubkey, "\n")
+	k.privkey = strings.Trim(k.privkey, "\n")
 	return
 }
 
