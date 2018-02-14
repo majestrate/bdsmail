@@ -1,6 +1,9 @@
 package config
 
-import "bds/lib/config/parser"
+import (
+	"bds/lib/config/parser"
+	log "github.com/Sirupsen/logrus"
+)
 
 type Config struct {
 	opts    map[string]string
@@ -21,6 +24,7 @@ func (c *Config) Load(fname string) (err error) {
 			c.opts = s.Options()
 			a := s.ValueOf("aliases")
 			if a != "" {
+				log.Infof("Loading Aliases %s", a)
 				err = c.Aliases.Load(a)
 			}
 		}

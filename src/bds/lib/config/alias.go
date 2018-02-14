@@ -3,17 +3,18 @@ package config
 import "bds/lib/config/parser"
 
 type AliasConfig struct {
-	conf *parser.Configuration
+	fname string
 }
 
 func (c *AliasConfig) Load(fname string) (err error) {
-	c.conf, err = parser.Read(fname)
+	c.fname = fname
 	return
 }
 
 func (c *AliasConfig) MX(hostname string) (addr string, ok bool) {
-	if c.conf != nil {
-		s, _ := c.conf.Section(hostname)
+	conf, _ := parser.Read(c.fname)
+	if conf != nil {
+		s, _ := conf.Section(hostname)
 		if s != nil {
 			addr = s.ValueOf("mx")
 			ok = addr != ""
