@@ -2,6 +2,7 @@ package pop3
 
 import (
 	"bds/lib/mailstore"
+	"bds/lib/starttls"
 	"bufio"
 	"crypto/tls"
 	"errors"
@@ -99,7 +100,8 @@ func (s *Server) obtainMessages(user string) (msgs []mailstore.Message, o int64,
 // pop3 session handler
 type pop3Session struct {
 	// network connection
-	c *textproto.Conn
+	nc net.Conn
+	c  *textproto.Conn
 	// parent server
 	s *Server
 	// are we in transaction state?
@@ -288,7 +290,18 @@ func (p *pop3Session) handleTransactionLine(line string) (err error) {
 func (p *pop3Session) handleLine(line string) (err error) {
 	parts := strings.Split(line, " ")
 	cmd := strings.ToUpper(parts[0])
+	c := p.c
 	switch cmd {
+	case "STARTTLS":
+		if p.s.TLS == nil {
+			err = p.Error("no TLS supported")
+		} else {
+			p.OK("Begin TLS negotiation")
+			p.c, _, err = starttls.HandleStartTLS(p.nc, p.s.TLS)
+			if err != nil {
+				c.Close()
+			}
+		}
 	case "NOOP":
 		err = p.OK("")
 		break
@@ -339,8 +352,9 @@ func (s *Server) Serve(l net.Listener) (err error) {
 		c, err = l.Accept()
 		if err == nil {
 			p := &pop3Session{
-				c: textproto.NewConn(c),
-				s: s,
+				nc: c,
+				c:  textproto.NewConn(c),
+				s:  s,
 			}
 			go p.Run()
 		}
