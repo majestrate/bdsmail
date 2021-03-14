@@ -10,12 +10,12 @@ endif
 all: build
 
 build:
-	GOPATH=$(REPO) $(GO) install -v bds/cmd/maild
-	GOPATH=$(REPO) $(GO) install -v bds/cmd/mailtool
-	GOPATH=$(REPO) $(GO) install -v bds/cmd/bdsconfig
+	$(GO) install -v github.com/majestrate/bdsmail/cmd/maild
+	$(GO) install -v github.com/majestrate/bdsmail/cmd/mailtool
+	$(GO) install -v github.com/majestrate/bdsmail/cmd/bdsconfig
 
 clean:
-	GOPATH=$(REPO) $(GO) clean -v
+	$(GO) clean -v
 	rm -fr $(REPO)/pkg
 test:
-	GOPATH=$(REPO) $(GO) test bds/lib/...
+	$(GO) test github.com/majestrate/bdsmail/lib/...
