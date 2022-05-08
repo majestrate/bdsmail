@@ -1,12 +1,12 @@
 package pop3
 
 import (
-	"github.com/majestrate/bdsmail/lib/mailstore"
-	"github.com/majestrate/bdsmail/lib/starttls"
 	"bufio"
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"github.com/majestrate/bdsmail/lib/mailstore"
+	"github.com/majestrate/bdsmail/lib/starttls"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"

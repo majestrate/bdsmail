@@ -1,10 +1,10 @@
 package model
 
 import (
-	"github.com/majestrate/bdsmail/lib/base91"
 	"bytes"
 	"crypto/rand"
 	"crypto/sha256"
+	"github.com/majestrate/bdsmail/lib/base91"
 	"io"
 	"strings"
 )
@@ -15,7 +15,7 @@ type LoginCred string
 const login_cred_delim = " "
 
 // how many iterations of sha256 to use
-const num_sha_digest_iteration = 1024 * 1024 
+const num_sha_digest_iteration = 1024 * 1024
 
 // generate a new login cred, generates random salt and stores as hashed
 func NewLoginCred(secret string) LoginCred {
@@ -30,7 +30,7 @@ func NewLoginCred(secret string) LoginCred {
 // hash login credential with a salt
 func credHash(data, salt []byte) (h []byte) {
 	l := len(data) + len(salt)
-	d := make([]byte, l + sha256.Size)
+	d := make([]byte, l+sha256.Size)
 	copy(d, data)
 	copy(d[:len(data)], salt)
 	i := num_sha_digest_iteration

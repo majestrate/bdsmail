@@ -1,9 +1,9 @@
 package mailutil
 
 import (
-	"github.com/majestrate/bdsmail/lib/util"
 	"bufio"
 	"fmt"
+	"github.com/majestrate/bdsmail/lib/util"
 	"io"
 	"mime/multipart"
 	"net/textproto"

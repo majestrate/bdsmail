@@ -46,7 +46,7 @@ func NewTLSCert(org string, ca bool) x509.Certificate {
 		NotBefore:             time.Now(),
 		NotAfter:              time.Date(9005, 1, 1, 1, 1, 1, 1, time.UTC),
 		BasicConstraintsValid: true,
-		IsCA: ca,
+		IsCA:                  ca,
 	}
 }
 

@@ -1,11 +1,11 @@
 package db
 
 import (
+	"github.com/go-xorm/xorm"
 	"github.com/majestrate/bdsmail/lib/mailstore"
 	"github.com/majestrate/bdsmail/lib/model"
-	log "github.com/sirupsen/logrus"
-	"github.com/go-xorm/xorm"
 	_ "github.com/mattn/go-sqlite3"
+	log "github.com/sirupsen/logrus"
 	"strings"
 )
 

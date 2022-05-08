@@ -1,9 +1,9 @@
 package sendmail
 
 import (
+	"errors"
 	"github.com/majestrate/bdsmail/lib/mailstore"
 	"github.com/majestrate/bdsmail/lib/smtp"
-	"errors"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"

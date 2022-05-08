@@ -1,12 +1,12 @@
 package smtp
 
 import (
-	"github.com/majestrate/bdsmail/lib/mailstore"
-	mail "github.com/majestrate/bdsmail/lib/mailutil"
-	"github.com/majestrate/bdsmail/lib/starttls"
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
+	"github.com/majestrate/bdsmail/lib/mailstore"
+	mail "github.com/majestrate/bdsmail/lib/mailutil"
+	"github.com/majestrate/bdsmail/lib/starttls"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"net"

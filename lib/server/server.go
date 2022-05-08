@@ -1,6 +1,10 @@
 package server
 
 import (
+	"bytes"
+	"crypto/tls"
+	"errors"
+	"fmt"
 	"github.com/majestrate/bdsmail/lib/config"
 	"github.com/majestrate/bdsmail/lib/db"
 	"github.com/majestrate/bdsmail/lib/i2p"
@@ -14,10 +18,6 @@ import (
 	"github.com/majestrate/bdsmail/lib/starttls"
 	"github.com/majestrate/bdsmail/lib/util"
 	"github.com/majestrate/bdsmail/lib/web"
-	"bytes"
-	"crypto/tls"
-	"errors"
-	"fmt"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"net/http"

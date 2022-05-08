@@ -1,9 +1,9 @@
 package maildir
 
 import (
-	"github.com/majestrate/bdsmail/lib/mailstore"
 	"crypto/rand"
 	"fmt"
+	"github.com/majestrate/bdsmail/lib/mailstore"
 	log "github.com/sirupsen/logrus"
 	"io"
 	"os"
