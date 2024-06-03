@@ -119,7 +119,9 @@ func (s *Server) Bind() (err error) {
 	name := util.RandStr(5)
 	log.Info("Starting up I2P connection... hang tight we'll get there")
 	// craete session
-	session := i2p.NewSession(name, i2paddr, keyfile, make(map[string]string))
+	session_opts := make(map[string]string)
+	session_opts["i2cp.leaseSetEncType"] = "4,0"
+	session := i2p.NewSession(name, i2paddr, keyfile, session_opts)
 	err = session.Open()
 	if err == nil {
 		// made session
