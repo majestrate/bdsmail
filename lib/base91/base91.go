@@ -35,9 +35,7 @@ var dectab = []byte{
 	91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91, 91,
 }
 
-//
 // encode bytes to base91'd string
-//
 func Encode(data []byte) []byte {
 	nbits := uint32(0)
 	queue := uint32(0)

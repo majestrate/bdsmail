@@ -1,4 +1,2 @@
-//
 // web ui
-//
 package web

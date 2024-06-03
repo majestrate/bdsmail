@@ -1,4 +1,2 @@
-//
 // MVC models
-//
 package model
